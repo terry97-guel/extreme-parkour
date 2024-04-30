@@ -208,7 +208,9 @@ class PPO:
                 with torch.inference_mode():
                     hist_latent_batch = self.actor_critic.actor.infer_hist_latent(obs_batch)
                 priv_reg_loss = (priv_latent_batch - hist_latent_batch.detach()).norm(p=2, dim=1).mean()
-                priv_reg_stage = min(max((self.counter - self.priv_reg_coef_schedual[2]), 0) / self.priv_reg_coef_schedual[3], 1)
+                priv_reg_stage = min(
+                    max((self.counter - self.priv_reg_coef_schedual[2]), 0) / self.priv_reg_coef_schedual[3],
+                    1)
                 priv_reg_coef = priv_reg_stage * (self.priv_reg_coef_schedual[1] - self.priv_reg_coef_schedual[0]) + self.priv_reg_coef_schedual[0]
 
                 # Estimator
@@ -310,17 +312,17 @@ class PPO:
         self.update_counter()
         return mean_hist_latent_loss
 
-    def update_depth_encoder(self, depth_latent_batch, scandots_latent_batch):
-        # Depth encoder ditillation
-        if self.if_depth:
-            # TODO: needs to save hidden states
-            depth_encoder_loss = (scandots_latent_batch.detach() - depth_latent_batch).norm(p=2, dim=1).mean()
+    # def update_depth_encoder(self, depth_latent_batch, scandots_latent_batch):
+    #     # Depth encoder ditillation
+    #     if self.if_depth:
+    #         # TODO: needs to save hidden states
+    #         depth_encoder_loss = (scandots_latent_batch.detach() - depth_latent_batch).norm(p=2, dim=1).mean()
 
-            self.depth_encoder_optimizer.zero_grad()
-            depth_encoder_loss.backward()
-            nn.utils.clip_grad_norm_(self.depth_encoder.parameters(), self.max_grad_norm)
-            self.depth_encoder_optimizer.step()
-            return depth_encoder_loss.item()
+    #         self.depth_encoder_optimizer.zero_grad()
+    #         depth_encoder_loss.backward()
+    #         nn.utils.clip_grad_norm_(self.depth_encoder.parameters(), self.max_grad_norm)
+    #         self.depth_encoder_optimizer.step()
+    #         return depth_encoder_loss.item()
     
     def update_depth_actor(self, actions_student_batch, actions_teacher_batch, yaw_student_batch, yaw_teacher_batch):
         if self.if_depth:
@@ -335,46 +337,46 @@ class PPO:
             self.depth_actor_optimizer.step()
             return depth_actor_loss.item(), yaw_loss.item()
     
-    def update_depth_both(self, depth_latent_batch, scandots_latent_batch, actions_student_batch, actions_teacher_batch):
-        if self.if_depth:
-            depth_encoder_loss = (scandots_latent_batch.detach() - depth_latent_batch).norm(p=2, dim=1).mean()
-            depth_actor_loss = (actions_teacher_batch.detach() - actions_student_batch).norm(p=2, dim=1).mean()
+    # def update_depth_both(self, depth_latent_batch, scandots_latent_batch, actions_student_batch, actions_teacher_batch):
+    #     if self.if_depth:
+    #         depth_encoder_loss = (scandots_latent_batch.detach() - depth_latent_batch).norm(p=2, dim=1).mean()
+    #         depth_actor_loss = (actions_teacher_batch.detach() - actions_student_batch).norm(p=2, dim=1).mean()
 
-            depth_loss = depth_encoder_loss + depth_actor_loss
+    #         depth_loss = depth_encoder_loss + depth_actor_loss
 
-            self.depth_actor_optimizer.zero_grad()
-            depth_loss.backward()
-            nn.utils.clip_grad_norm_([*self.depth_actor.parameters(), *self.depth_encoder.parameters()], self.max_grad_norm)
-            self.depth_actor_optimizer.step()
-            return depth_encoder_loss.item(), depth_actor_loss.item()
+    #         self.depth_actor_optimizer.zero_grad()
+    #         depth_loss.backward()
+    #         nn.utils.clip_grad_norm_([*self.depth_actor.parameters(), *self.depth_encoder.parameters()], self.max_grad_norm)
+    #         self.depth_actor_optimizer.step()
+    #         return depth_encoder_loss.item(), depth_actor_loss.item()
     
     def update_counter(self):
         self.counter += 1
     
-    def compute_apt_reward(self, source, target):
+    # def compute_apt_reward(self, source, target):
 
-        b1, b2 = source.size(0), target.size(0)
-        # (b1, 1, c) - (1, b2, c) -> (b1, 1, c) - (1, b2, c) -> (b1, b2, c) -> (b1, b2)
-        # sim_matrix = torch.norm(source[:, None, ::2].view(b1, 1, -1) - target[None, :, ::2].view(1, b2, -1), dim=-1, p=2)
-        # sim_matrix = torch.norm(source[:, None, :2].view(b1, 1, -1) - target[None, :, :2].view(1, b2, -1), dim=-1, p=2)
-        sim_matrix = torch.norm(source[:, None, :].view(b1, 1, -1) - target[None, :, :].view(1, b2, -1), dim=-1, p=2)
+    #     b1, b2 = source.size(0), target.size(0)
+    #     # (b1, 1, c) - (1, b2, c) -> (b1, 1, c) - (1, b2, c) -> (b1, b2, c) -> (b1, b2)
+    #     # sim_matrix = torch.norm(source[:, None, ::2].view(b1, 1, -1) - target[None, :, ::2].view(1, b2, -1), dim=-1, p=2)
+    #     # sim_matrix = torch.norm(source[:, None, :2].view(b1, 1, -1) - target[None, :, :2].view(1, b2, -1), dim=-1, p=2)
+    #     sim_matrix = torch.norm(source[:, None, :].view(b1, 1, -1) - target[None, :, :].view(1, b2, -1), dim=-1, p=2)
 
-        reward, _ = sim_matrix.topk(self.knn_k, dim=1, largest=False, sorted=True)  # (b1, k)
+    #     reward, _ = sim_matrix.topk(self.knn_k, dim=1, largest=False, sorted=True)  # (b1, k)
 
-        if not self.knn_avg:  # only keep k-th nearest neighbor
-            reward = reward[:, -1]
-            reward = reward.reshape(-1, 1)  # (b1, 1)
-            if self.rms:
-                moving_mean, moving_std = self.disc_state_rms(reward)
-                reward = reward / moving_std
-            reward = torch.clamp(reward - self.knn_clip, 0)  # (b1, )
-        else:  # average over all k nearest neighbors
-            reward = reward.reshape(-1, 1)  # (b1 * k, 1)
-            if self.rms:
-                moving_mean, moving_std = self.disc_state_rms(reward)
-                reward = reward / moving_std
-            reward = torch.clamp(reward - self.knn_clip, 0)
-            reward = reward.reshape((b1, self.knn_k))  # (b1, k)
-            reward = reward.mean(dim=1)  # (b1,)
-        reward = torch.log(reward + 1.0)
-        return reward
+    #     if not self.knn_avg:  # only keep k-th nearest neighbor
+    #         reward = reward[:, -1]
+    #         reward = reward.reshape(-1, 1)  # (b1, 1)
+    #         if self.rms:
+    #             moving_mean, moving_std = self.disc_state_rms(reward)
+    #             reward = reward / moving_std
+    #         reward = torch.clamp(reward - self.knn_clip, 0)  # (b1, )
+    #     else:  # average over all k nearest neighbors
+    #         reward = reward.reshape(-1, 1)  # (b1 * k, 1)
+    #         if self.rms:
+    #             moving_mean, moving_std = self.disc_state_rms(reward)
+    #             reward = reward / moving_std
+    #         reward = torch.clamp(reward - self.knn_clip, 0)
+    #         reward = reward.reshape((b1, self.knn_k))  # (b1, k)
+    #         reward = reward.mean(dim=1)  # (b1,)
+    #     reward = torch.log(reward + 1.0)
+    #     return reward

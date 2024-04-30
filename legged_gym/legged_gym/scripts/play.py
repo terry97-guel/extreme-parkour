@@ -56,11 +56,17 @@ def get_load_path(root, load_run=-1, checkpoint=-1, model_name_include="model"):
     return model, checkpoint
 
 def play(args):
+    args.headless = False
+    args.debug = True
+    args.exptid = "APR-29"
+    args.device = 'cuda:1'
+    args.use_camera = True
+
     if args.web:
         web_viewer = webviewer.WebViewer()
     faulthandler.enable()
     exptid = args.exptid
-    log_pth = "../../logs/{}/".format(args.proj_name) + args.exptid
+    log_pth = "{}/logs/{}/".format(LEGGED_GYM_ROOT_DIR, args.proj_name) + args.exptid
 
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing
@@ -72,6 +78,27 @@ def play(args):
     env_cfg.terrain.num_rows = 5
     env_cfg.terrain.num_cols = 5
     env_cfg.terrain.height = [0.02, 0.02]
+    # env_cfg.terrain.terrain_dict = {"smooth slope": 0., 
+    #                                 "rough slope up": 0.0,
+    #                                 "rough slope down": 0.0,
+    #                                 "rough stairs up": 0., 
+    #                                 "rough stairs down": 0., 
+    #                                 "discrete": 0., 
+    #                                 "stepping stones": 0.0,
+    #                                 "gaps": 0., 
+    #                                 "smooth flat": 0,
+    #                                 "pit": 0.0,
+    #                                 "wall": 0.0,
+    #                                 "platform": 0.,
+    #                                 "large stairs up": 0.,
+    #                                 "large stairs down": 0.,
+    #                                 "parkour": 0.2,
+    #                                 "parkour_hurdle": 0.2,
+    #                                 "parkour_flat": 0.,
+    #                                 "parkour_step": 0.2,
+    #                                 "parkour_gap": 0.2, 
+    #                                 "demo": 0.2}
+    
     env_cfg.terrain.terrain_dict = {"smooth slope": 0., 
                                     "rough slope up": 0.0,
                                     "rough slope down": 0.0,
@@ -86,12 +113,12 @@ def play(args):
                                     "platform": 0.,
                                     "large stairs up": 0.,
                                     "large stairs down": 0.,
-                                    "parkour": 0.2,
-                                    "parkour_hurdle": 0.2,
-                                    "parkour_flat": 0.,
-                                    "parkour_step": 0.2,
-                                    "parkour_gap": 0.2, 
-                                    "demo": 0.2}
+                                    "parkour": 0,
+                                    "parkour_hurdle": 0,
+                                    "parkour_flat": 1.0,
+                                    "parkour_step": 0,
+                                    "parkour_gap": 0, 
+                                    "demo": 0.0}
     
     env_cfg.terrain.terrain_proportions = list(env_cfg.terrain.terrain_dict.values())
     env_cfg.terrain.curriculum = False
