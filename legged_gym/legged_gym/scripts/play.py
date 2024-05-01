@@ -60,7 +60,7 @@ def play(args):
     args.debug = True
     args.exptid = "APR-29"
     args.device = 'cuda:1'
-    args.use_camera = True
+    args.use_camera = False
 
     if args.web:
         web_viewer = webviewer.WebViewer()
@@ -115,10 +115,10 @@ def play(args):
                                     "large stairs down": 0.,
                                     "parkour": 0,
                                     "parkour_hurdle": 0,
-                                    "parkour_flat": 1.0,
+                                    "parkour_flat": 0.0,
                                     "parkour_step": 0,
                                     "parkour_gap": 0, 
-                                    "demo": 0.0}
+                                    "demo": 1.0}
     
     env_cfg.terrain.terrain_proportions = list(env_cfg.terrain.terrain_dict.values())
     env_cfg.terrain.curriculum = False
