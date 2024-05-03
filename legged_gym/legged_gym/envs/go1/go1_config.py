@@ -32,7 +32,7 @@ from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobot
 
 class Go1RoughCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
-        pos = [0.0, 0.0, 0.42] # x,y,z [m]
+        pos = [0.0, 0.0, 0.34] # x,y,z [m]
         default_joint_angles = { # = target angles [rad] when action = 0.0
             'FL_hip_joint': 0.1,   # [rad]
             'RL_hip_joint': 0.1,   # [rad]
@@ -49,33 +49,14 @@ class Go1RoughCfg( LeggedRobotCfg ):
             'FR_calf_joint': -1.5,  # [rad]
             'RR_calf_joint': -1.5,    # [rad]
         }
-
-    class init_state_slope( LeggedRobotCfg.init_state ):
-        pos = [0.56, 0.0, 0.24] # x,y,z [m]
-        default_joint_angles = { # = target angles [rad] when action = 0.0
-            'FL_hip_joint': 0.03,   # [rad]
-            'RL_hip_joint': 0.03,   # [rad]
-            'FR_hip_joint': -0.03,  # [rad]
-            'RR_hip_joint': -0.03,   # [rad]
-
-            'FL_thigh_joint': 1.0,     # [rad]
-            'RL_thigh_joint': 1.9,   # [rad]1.8
-            'FR_thigh_joint': 1.0,     # [rad]
-            'RR_thigh_joint': 1.9,   # [rad]
-
-            'FL_calf_joint': -2.2,   # [rad]
-            'RL_calf_joint': -0.9,    # [rad]
-            'FR_calf_joint': -2.2,  # [rad]
-            'RR_calf_joint': -0.9,    # [rad]
-        }
         
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
         control_type = 'P'
-        # stiffness = {'joint': 40.}  # [N*m/rad]
-        # damping = {'joint': 0.5}     # [N*m*s/rad]
-        stiffness = {'joint': 30.}  # [N*m/rad]
-        damping = {'joint': 0.6}     # [N*m*s/rad]
+        stiffness = {'joint': 40.}  # [N*m/rad]
+        damping = {'joint': 1.0}     # [N*m*s/rad]
+        # stiffness = {'joint': 30.}  # [N*m/rad]
+        # damping = {'joint': 0.6}     # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 0.25
         # decimation: Number of control action updates @ sim DT per policy DT
@@ -83,24 +64,31 @@ class Go1RoughCfg( LeggedRobotCfg ):
 
     class asset( LeggedRobotCfg.asset ):
         # file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/go1/urdf/go1_new.urdf'
-        file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/a1/urdf/a1.urdf'
+        file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/go1/urdf/go1.urdf'
         foot_name = "foot"
-        penalize_contacts_on = ["thigh", "calf"]
+        penalize_contacts_on = ["thigh", "calf", "base"]
         terminate_after_contacts_on = ["base"]#, "thigh", "calf"]
         self_collisions = 1 # 1 to disable, 0 to enable...bitwise filter
-  
+        flip_visual_attachments = True
+        
     class rewards( LeggedRobotCfg.rewards ):
         soft_dof_pos_limit = 0.9
         base_height_target = 0.25
         # class scales( LeggedRobotCfg.rewards.scales ):
             # torques = -0.0002
             # dof_pos_limits = -10.0
+        feet_stumble = -2
+
+    class terrain(LeggedRobotCfg.terrain):
+        # difficulty_scale = 0.66
+        difficulty_scale = 1.0
+        max_init_terrain_level = 3
 
 class Go1RoughCfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):
         entropy_coef = 0.01
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
-        experiment_name = 'rough_a1'
+        experiment_name = 'rough_go1'
 
   

@@ -125,6 +125,8 @@ def update_cfg_from_args(env_cfg, cfg_train, args):
     if env_cfg is not None:
         if args.use_camera:
             env_cfg.depth.use_camera = args.use_camera
+        if args.distill_only_heading:
+            env_cfg.distill_only_heading = args.distill_only_heading
         if env_cfg.depth.use_camera and args.headless:  # set camera specific parameters
             env_cfg.env.num_envs = env_cfg.depth.camera_num_envs
             env_cfg.terrain.num_rows = env_cfg.depth.camera_terrain_num_rows
@@ -181,7 +183,7 @@ def update_cfg_from_args(env_cfg, cfg_train, args):
 
 def get_args():
     custom_parameters = [
-        {"name": "--task", "type": str, "default": "a1", "help": "Resume training or start testing from a checkpoint. Overrides config file if provided."},
+        {"name": "--task", "type": str, "default": "go1", "help": "Resume training or start testing from a checkpoint. Overrides config file if provided."},
         {"name": "--resume", "action": "store_true", "default": False,  "help": "Resume training from a checkpoint"},
         {"name": "--experiment_name", "type": str,  "help": "Name of the experiment to run or load. Overrides config file if provided."},
         {"name": "--run_name", "type": str,  "help": "Name of the run. Overrides config file if provided."},
@@ -206,6 +208,8 @@ def get_args():
         {"name": "--resumeid", "type": str, "help": "exptid"},
         {"name": "--daggerid", "type": str, "help": "name of dagger run"},
         {"name": "--use_camera", "action": "store_true", "default": False, "help": "render camera for distillation"},
+        {"name": "--distill_only_heading", "action": "store_true", "default": False, "help": "distil only heading (i.e. height map + heading prediction)"},
+
 
         {"name": "--mask_obs", "action": "store_true", "default": False, "help": "Mask observation when playing"},
         {"name": "--use_jit", "action": "store_true", "default": False, "help": "Load jit script when playing"},

@@ -39,6 +39,11 @@ from pydelatin import Delatin
 import pyfqmr
 from scipy.ndimage import binary_dilation
 
+# go1_adjust_height_scale = 0.66
+# go1_adjust_gap_scale    = 0.66
+
+go1_adjust_height_scale = 1.0
+go1_adjust_gap_scale    = 1.0
 
 class Terrain:
     def __init__(self, cfg: LeggedRobotCfg.terrain, num_robots) -> None:
@@ -68,14 +73,14 @@ class Terrain:
 
         self.height_field_raw = np.zeros((self.tot_rows , self.tot_cols), dtype=np.int16)
         if cfg.curriculum:
-            self.curiculum()
+            self.curiculum(difficulty_scale=cfg.difficulty_scale)
         elif cfg.selected:
             self.selected_terrain()
         else:    
             if hasattr(cfg, "max_difficulty"):
-                self.curiculum(random=True, max_difficulty=cfg.max_difficulty)
+                self.curiculum(random=True, max_difficulty=cfg.max_difficulty, difficulty_scale=cfg.difficulty_scale)
             else:
-                self.curiculum(random=True)
+                self.curiculum(random=True, difficulty_scale=cfg.difficulty_scale)
             # self.randomized_terrain()   
         
         self.heightsamples = self.height_field_raw
@@ -114,18 +119,18 @@ class Terrain:
             terrain = self.make_terrain(choice, difficulty)
             self.add_terrain_to_map(terrain, i, j)
         
-    def curiculum(self, random=False, max_difficulty=False):
+    def curiculum(self, random=False, max_difficulty=False, difficulty_scale=1):
         for j in range(self.cfg.num_cols):
             for i in range(self.cfg.num_rows):
                 difficulty = i / (self.cfg.num_rows-1)
                 choice = j / self.cfg.num_cols + 0.001
                 if random:
                     if max_difficulty:
-                        terrain = self.make_terrain(choice, np.random.uniform(0.7, 1))
+                        terrain = self.make_terrain(choice, np.random.uniform(0.7, 1) * difficulty_scale)
                     else:
-                        terrain = self.make_terrain(choice, np.random.uniform(0, 1))
+                        terrain = self.make_terrain(choice, np.random.uniform(0, 1) * difficulty_scale)
                 else:
-                    terrain = self.make_terrain(choice, difficulty)
+                    terrain = self.make_terrain(choice, difficulty*difficulty_scale)
 
                 self.add_terrain_to_map(terrain, i, j)
 
@@ -273,7 +278,7 @@ class Terrain:
             parkour_hurdle_terrain(terrain,
                                    num_stones=self.num_goals - 2,
                                    stone_len=0.1+0.3*difficulty,
-                                   hurdle_height_range=[0.1+0.1*difficulty, 0.15+0.25*difficulty],
+                                   hurdle_height_range=[0.1+0.1*difficulty * go1_adjust_height_scale, 0.15+0.25*difficulty*go1_adjust_height_scale],
                                    pad_height=0,
                                    x_range=[1.2, 2.2],
                                    y_range=self.cfg.y_range,
@@ -297,7 +302,7 @@ class Terrain:
             idx = 18
             parkour_step_terrain(terrain,
                                    num_stones=self.num_goals - 2,
-                                   step_height=0.1 + 0.35*difficulty,
+                                   step_height=0.1 + 0.35*difficulty * go1_adjust_height_scale,
                                    x_range=[0.3,1.5],
                                    y_range=self.cfg.y_range,
                                    half_valid_width=[0.5, 1],
@@ -308,7 +313,7 @@ class Terrain:
             idx = 19
             parkour_gap_terrain(terrain,
                                 num_gaps=self.num_goals - 2,
-                                gap_size=0.1 + 0.7 * difficulty,
+                                gap_size=0.1 + 0.7 * difficulty * go1_adjust_gap_scale,
                                 gap_depth=[0.2, 1],
                                 pad_height=0,
                                 x_range=[0.8, 1.5],

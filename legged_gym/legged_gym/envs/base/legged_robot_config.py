@@ -130,6 +130,9 @@ class LeggedRobotCfg(BaseConfig):
             ang_vel = 0.05
             gravity = 0.02
             height_measurements = 0.02
+    
+    class distill_only_heading:
+        distill_only_heading = True
 
     class terrain:
         mesh_type = 'trimesh' # "heightfield" # none, plane, heightfield or trimesh
@@ -197,6 +200,7 @@ class LeggedRobotCfg(BaseConfig):
         origin_zero_z = True
 
         num_goals = 8
+        difficulty_scale = 1.0
 
     class commands:
         curriculum = False
@@ -391,6 +395,13 @@ class LeggedRobotCfgPPO(BaseConfig):
         hidden_dims = 512
         learning_rate = 1.e-3
         num_steps_per_env = LeggedRobotCfg.depth.update_interval * 24
+
+    class heading_distill:
+        if_distill_heading = LeggedRobotCfg.distill_only_heading.distill_only_heading
+        resume_layer = 0
+        hidden_dims = [128, 64]  # Total layers: TeacherLayer[:resume_layer] + HiddenDims
+        learning_rate = 1.e-4    # 
+        num_steps_per_env = 24   # latency of mocap
 
     class estimator:
         train_with_estimated_states = True

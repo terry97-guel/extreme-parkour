@@ -61,6 +61,7 @@ class OnPolicyRunner:
         self.policy_cfg = train_cfg["policy"]
         self.estimator_cfg = train_cfg["estimator"]
         self.depth_encoder_cfg = train_cfg["depth_encoder"]
+        self.heading_distill_cfg = train_cfg["heading_distill"]
         self.device = device
         self.env = env
 
@@ -76,6 +77,7 @@ class OnPolicyRunner:
         estimator = Estimator(input_dim=env.cfg.env.n_proprio, output_dim=env.cfg.env.n_priv, hidden_dims=self.estimator_cfg["hidden_dims"]).to(self.device)
         # Depth encoder
         self.if_depth = self.depth_encoder_cfg["if_depth"]
+        # self.if_distill_heading = self.heading_distill_cfg["if_distill_heading"]
         if self.if_depth:
             depth_backbone = DepthOnlyFCBackbone58x87(env.cfg.env.n_proprio, 
                                                     self.policy_cfg["scan_encoder_dims"][-1], 
@@ -83,6 +85,9 @@ class OnPolicyRunner:
                                                     )
             depth_encoder = RecurrentDepthBackbone(depth_backbone, env.cfg).to(self.device)
             depth_actor = deepcopy(actor_critic.actor)
+        # elif self.if_distill_heading:
+            # heading_prediction_head = None
+            
         else:
             depth_encoder = None
             depth_actor = None

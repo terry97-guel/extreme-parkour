@@ -41,27 +41,36 @@ import wandb
 
 def train(args):
     args.headless = True
+    # args.debug = True
 
-    args.headless = False
-    args.debug = True
-    args.exptid = "tmprun"
-    args.device = 'cuda:1'
+    if args.debug:
+        print("Warning: Debug mode is enabled!\n"*50)
+        mode = "disabled"
+        args.rows = 10
+        args.cols = 8
+        args.num_envs = 64
+        
+        args.exptid = "tmprun"
+        args.device = 'cuda:0'
+        args.headless = False
+        args.task = 'go1'
+
+        args.exptid = "G-0502-student"
+        args.resume = True
+        args.use_camera = True
+        args.delay = True
+        
+    else:
+        mode = "online"
+    
+    if args.no_wandb:
+        mode = "disabled"
 
     log_pth = LEGGED_GYM_ROOT_DIR + "/logs/{}/".format(args.proj_name) + args.exptid
     try:
         os.makedirs(log_pth)
     except:
         pass
-    if args.debug:
-        mode = "disabled"
-        args.rows = 10
-        args.cols = 8
-        args.num_envs = 64
-    else:
-        mode = "online"
-    
-    if args.no_wandb:
-        mode = "disabled"
 
     wandb.init(project=args.proj_name, name=args.exptid, dir="../../logs", mode=mode)
     # wandb.init(project=args.proj_name, name=args.exptid, entity="parkour", group=args.exptid[:3], mode=mode, dir="../../logs")

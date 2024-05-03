@@ -58,8 +58,11 @@ def get_load_path(root, load_run=-1, checkpoint=-1, model_name_include="model"):
 def play(args):
     args.headless = False
     args.debug = True
-    args.exptid = "APR-29"
-    args.device = 'cuda:1'
+
+    args.task = "go1"
+    args.exptid = "G0502"
+    # args.exptid = "MAY-02"
+    args.device = 'cuda:0'
     args.use_camera = False
 
     if args.web:
@@ -70,6 +73,8 @@ def play(args):
 
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing
+    env_cfg.terrain.difficulty_scale = 1
+
     if args.nodelay:
         env_cfg.domain_rand.action_delay_view = 0
     env_cfg.env.num_envs = 16 if not args.save else 64
@@ -99,7 +104,7 @@ def play(args):
     #                                 "parkour_gap": 0.2, 
     #                                 "demo": 0.2}
     
-    env_cfg.terrain.terrain_dict = {"smooth slope": 0., 
+    env_cfg.terrain.terrain_dict = {"smooth slope": 0.0, 
                                     "rough slope up": 0.0,
                                     "rough slope down": 0.0,
                                     "rough stairs up": 0., 
@@ -113,12 +118,12 @@ def play(args):
                                     "platform": 0.,
                                     "large stairs up": 0.,
                                     "large stairs down": 0.,
-                                    "parkour": 0,
-                                    "parkour_hurdle": 0,
+                                    "parkour": 0.0,
+                                    "parkour_hurdle": 1.0,
                                     "parkour_flat": 0.0,
-                                    "parkour_step": 0,
-                                    "parkour_gap": 0, 
-                                    "demo": 1.0}
+                                    "parkour_step": 0.0,
+                                    "parkour_gap": 0.0, 
+                                    "demo": 0.0}
     
     env_cfg.terrain.terrain_proportions = list(env_cfg.terrain.terrain_dict.values())
     env_cfg.terrain.curriculum = False
