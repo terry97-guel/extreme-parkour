@@ -41,7 +41,7 @@ import wandb
 
 def train(args):
     args.headless = True
-    # args.debug = True
+    args.debug = True
 
     if args.debug:
         print("Warning: Debug mode is enabled!\n"*50)
@@ -50,12 +50,12 @@ def train(args):
         args.cols = 8
         args.num_envs = 64
         
-        args.exptid = "tmprun"
         args.device = 'cuda:0'
         args.headless = False
         args.task = 'go1'
 
-        args.exptid = "G-0502-student"
+        args.exptid = "tmprun"
+        args.resumeid = "MAY-02"
         args.resume = True
         args.use_camera = True
         args.delay = True

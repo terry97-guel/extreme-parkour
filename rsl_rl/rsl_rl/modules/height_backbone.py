@@ -3,7 +3,7 @@ import torch.nn as nn
 import sys
 import torchvision
 
-class RecurrentDepthBackbone(nn.Module):
+class RecurrentHeighBackbone(nn.Module):
     def __init__(self, base_backbone, env_cfg) -> None:
         super().__init__()
         activation = nn.ELU()
@@ -39,8 +39,8 @@ class RecurrentDepthBackbone(nn.Module):
 
     def detach_hidden_states(self):
         self.hidden_states = self.hidden_states.detach().clone()
-
-class DepthOnlyFCBackbone58x87(nn.Module):
+    
+class HeightOnlyFCBackbone(nn.Module):
     def __init__(self, prop_dim, scandots_output_dim, hidden_state_dim, output_activation=None, num_frames=1):
         super().__init__()
 
