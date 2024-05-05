@@ -86,18 +86,12 @@ class OnPolicyRunner:
             depth_encoder = RecurrentDepthBackbone(depth_backbone, env.cfg).to(self.device)
             depth_actor = deepcopy(actor_critic.actor)
         elif self.if_distill_heading:
-            height_backbone = HeightOnlyFCBackbone(env.cfg.env.n_proprio, 
-                                                    self.policy_cfg["scan_encoder_dims"][-1], 
-                                                    hidden_state_dim=None
-                                                    )
+            height_backbone = deepcopy(actor_critic.actor.scan_encoder)
             height_encoder = RecurrentHeighBackbone(height_backbone, env.cfg).to(self.device)
+            depth_actor = deepcopy(actor_critic.actor)
         else:
             depth_encoder = None
             depth_actor = None
-        # self.depth_encoder = depth_encoder
-        # self.depth_encoder_optimizer = optim.Adam(self.depth_encoder.parameters(), lr=self.depth_encoder_cfg["learning_rate"])
-        # self.depth_encoder_paras = self.depth_encoder_cfg
-        # self.depth_encoder_criterion = nn.MSELoss()
         # Create algorithm
         alg_class = eval(self.cfg["algorithm_class_name"]) # PPO
         self.alg: PPO = alg_class(actor_critic, 
@@ -116,7 +110,12 @@ class OnPolicyRunner:
             [self.env.num_actions],
         )
 
-        self.learn = self.learn_RL if not self.if_depth else self.learn_vision
+        if self.if_depth:
+            self.learn = self.learn_vision
+        elif self.if_distill_heading:
+            self.learn = self.learn_heading
+        else:
+            self.learn = self.learn_RL
             
         # Log
         self.log_dir = log_dir

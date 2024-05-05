@@ -126,7 +126,7 @@ def update_cfg_from_args(env_cfg, cfg_train, args):
         if args.use_camera:
             env_cfg.depth.use_camera = args.use_camera
         if args.distill_only_heading:
-            env_cfg.distill_only_heading = args.distill_only_heading
+            env_cfg.height.distill_only_heading = args.distill_only_heading
         if env_cfg.depth.use_camera and args.headless:  # set camera specific parameters
             env_cfg.env.num_envs = env_cfg.depth.camera_num_envs
             env_cfg.terrain.num_rows = env_cfg.depth.camera_terrain_num_rows
@@ -237,6 +237,9 @@ def get_args():
     args.sim_device = args.sim_device_type
     if args.sim_device=='cuda':
         args.sim_device += f":{args.sim_device_id}"
+
+    if args.distill_only_heading and args.use_camera:
+        raise ValueError("distill_only_heading and use_camera cannot be used together")
     return args
 
 def export_policy_as_jit(actor_critic, path, name):

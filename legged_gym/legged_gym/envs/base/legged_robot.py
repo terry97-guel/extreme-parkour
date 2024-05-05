@@ -176,6 +176,16 @@ class LeggedRobot(BaseTask):
         # crop 30 pixels from the left and right and and 20 pixels from bottom and return croped image
         return depth_image[:-2, 4:-4]
 
+
+    def update_height_buffer(self):
+        if not self.cfg.height.distill_only_heading:
+            return
+        if self.global_counter % self.cfg.height.update_interval != 0:
+            return
+        
+        heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.3 - self.measured_heights, -1, 1.)
+        self.height_buffer = torch.cat([self.height_buffer[:, 1:], heights], dim=1)
+
     def update_depth_buffer(self):
         if not self.cfg.depth.use_camera:
             return
@@ -262,6 +272,7 @@ class LeggedRobot(BaseTask):
         self.next_goals = self._gather_cur_goals(future=1)
 
         self.update_depth_buffer()
+        self.update_height_buffer()
 
         self.compute_observations() # in some cases a simulation step might be required to refresh some obs (for example body positions)
 
@@ -559,7 +570,7 @@ class LeggedRobot(BaseTask):
             self.commands[:, 2] *= torch.abs(self.commands[:, 2]) > self.cfg.commands.ang_vel_clip
         
         if self.cfg.terrain.measure_heights:
-            if self.global_counter % self.cfg.depth.update_interval == 0:
+            if self.global_counter % self.cfg.height.update_interval == 0:
                 self.measured_heights = self._get_heights()
         if self.cfg.domain_rand.push_robots and  (self.common_step_counter % self.cfg.domain_rand.push_interval == 0):
             self._push_robots()
@@ -788,6 +799,11 @@ class LeggedRobot(BaseTask):
                                             self.cfg.depth.buffer_len, 
                                             self.cfg.depth.resized[1], 
                                             self.cfg.depth.resized[0]).to(self.device)
+        elif self.cfg.height.distill_only_heading:
+            self.height_buffer = torch.zeros(self.num_envs,
+                                             self.cfg.height.buffer_len,
+                                            
+                                             )
 
     def _prepare_reward_function(self):
         """ Prepares a list of reward functions, whcih will be called to compute the total reward.

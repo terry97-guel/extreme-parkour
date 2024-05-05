@@ -92,7 +92,7 @@ class LeggedRobotCfg(BaseConfig):
         camera_terrain_num_rows = 10
         camera_terrain_num_cols = 20
 
-        position = [0.27, 0, 0.03]  # front camera
+        position = [0.30, 0, 0.03]  # front camera
         angle = [-5, 5]  # positive pitch down
 
         update_interval = 5  # 5 works without retraining, 8 worse
@@ -131,8 +131,16 @@ class LeggedRobotCfg(BaseConfig):
             gravity = 0.02
             height_measurements = 0.02
     
-    class distill_only_heading:
-        distill_only_heading = True
+    class height:
+        distill_only_heading = False
+        camera_terrain_num_rows = 10
+        camera_terrain_num_cols = 20
+        if distill_only_heading:
+            update_interval = 5 # TODO: Put latency of mocap
+        else:
+            update_interval = 5 # 5 works without retraining, 8 worse
+
+        buffer_len = 2
 
     class terrain:
         mesh_type = 'trimesh' # "heightfield" # none, plane, heightfield or trimesh
@@ -397,11 +405,11 @@ class LeggedRobotCfgPPO(BaseConfig):
         num_steps_per_env = LeggedRobotCfg.depth.update_interval * 24
 
     class heading_distill:
-        if_distill_heading = LeggedRobotCfg.distill_only_heading.distill_only_heading
+        if_distill_heading = LeggedRobotCfg.height.distill_only_heading
         resume_layer = 0
         hidden_dims = [128, 64]  # Total layers: TeacherLayer[:resume_layer] + HiddenDims
         learning_rate = 1.e-4    # 
-        num_steps_per_env = 24   # latency of mocap
+        num_steps_per_env = LeggedRobotCfg.height.update_interval * 24
 
     class estimator:
         train_with_estimated_states = True

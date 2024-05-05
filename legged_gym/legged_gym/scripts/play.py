@@ -60,10 +60,10 @@ def play(args):
     args.debug = True
 
     args.task = "go1"
-    args.exptid = "G0502"
-    # args.exptid = "MAY-02"
+    # args.exptid = "G0502"
+    args.exptid = "MAY-02-student"
     args.device = 'cuda:0'
-    args.use_camera = False
+    args.use_camera = True
 
     if args.web:
         web_viewer = webviewer.WebViewer()
@@ -187,7 +187,13 @@ def play(args):
                     depth_latent = depth_latent_and_yaw[:, :-2]
                     yaw = depth_latent_and_yaw[:, -2:]
                 obs[:, 6:8] = 1.5*yaw
-                    
+            elif env.cfg.height.distill_only_heading:
+                if infos["height"] is not None:
+                    obs_student = obs[:, :env.cfg.env.n_proprio].clone()
+                    obs_student[:, 6:8] = 0
+                    raise NotImplementedError
+
+
             else:
                 depth_latent = None
             
