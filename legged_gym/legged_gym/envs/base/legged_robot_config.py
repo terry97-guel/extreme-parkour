@@ -132,6 +132,7 @@ class LeggedRobotCfg(BaseConfig):
             height_measurements = 0.02
     
     class height:
+        height_num_envs = 192
         distill_only_heading = False
         camera_terrain_num_rows = 10
         camera_terrain_num_cols = 20

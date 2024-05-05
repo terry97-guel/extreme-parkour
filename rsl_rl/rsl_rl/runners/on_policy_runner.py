@@ -90,9 +90,11 @@ class OnPolicyRunner:
             student_vision_encoder_backbone = deepcopy(actor_critic.actor.scan_encoder)
             student_vision_encoder = RecurrentHeighBackbone(student_vision_encoder_backbone, env.cfg).to(self.device)
             student_actor = deepcopy(actor_critic.actor)
+            student_vision_encoder_paras = self.heading_distill_cfg
         else:
             student_vision_encoder = None
             student_actor = None
+            student_vision_encoder_paras = self.depth_encoder_cfg
         # Create algorithm
         alg_class = eval(self.cfg["algorithm_class_name"]) # PPO
         self.alg: PPO = alg_class(actor_critic, 
@@ -213,7 +215,7 @@ class OnPolicyRunner:
             stop = time.time()
             learn_time = stop - start
             if self.log_dir is not None:
-                self.log(locals())
+                self.log_RL(locals())
             if it < 2500:
                 if it % self.save_interval == 0:
                     self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
@@ -249,7 +251,7 @@ class OnPolicyRunner:
         for it in range(self.current_learning_iteration, tot_iter):
             start = time.time()
             depth_latent_buffer = []
-            scandots_latent_buffer = []
+            # scandots_latent_buffer = []
             actions_teacher_buffer = []
             actions_student_buffer = []
             yaw_buffer_student = []
@@ -257,9 +259,9 @@ class OnPolicyRunner:
             delta_yaw_ok_buffer = []
             for i in range(self.depth_encoder_cfg["num_steps_per_env"]):
                 if infos["depth"] != None:
-                    with torch.no_grad():
-                        scandots_latent = self.alg.actor_critic.actor.infer_scandots_latent(obs)
-                    scandots_latent_buffer.append(scandots_latent)
+                    # with torch.no_grad():
+                    #     scandots_latent = self.alg.actor_critic.actor.infer_scandots_latent(obs)
+                    # scandots_latent_buffer.append(scandots_latent)
                     obs_prop_depth = obs[:, :self.env.cfg.env.n_proprio].clone()
                     obs_prop_depth[:, 6:8] = 0
                     depth_latent_and_yaw = self.alg.student_vision_encoder(infos["depth"].clone(), obs_prop_depth)  # clone is crucial to avoid in-place operation
@@ -307,7 +309,7 @@ class OnPolicyRunner:
             start = stop
 
             delta_yaw_ok_percentage = sum(delta_yaw_ok_buffer) / len(delta_yaw_ok_buffer)
-            scandots_latent_buffer = torch.cat(scandots_latent_buffer, dim=0)
+            # scandots_latent_buffer = torch.cat(scandots_latent_buffer, dim=0)
             depth_latent_buffer = torch.cat(depth_latent_buffer, dim=0)
             student_vision_encoder_loss = 0
             # depth_encoder_loss = self.alg.update_depth_encoder(depth_latent_buffer, scandots_latent_buffer)
@@ -399,7 +401,110 @@ class OnPolicyRunner:
                        f"""{'ETA:':>{pad}} {mins:.0f} mins {secs:.1f} s\n""")
         print(log_string)
 
-    def log(self, locs, width=80, pad=35):
+
+    def learn_heading(self, num_learning_iterations, init_at_random_ep_len=False):
+        tot_iter = self.current_learning_iteration + num_learning_iterations
+        self.start_learning_iteration = copy(self.current_learning_iteration)
+
+        ep_infos = []
+        rewbuffer = deque(maxlen=100)
+        lenbuffer = deque(maxlen=100)
+        cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
+        cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
+        
+        obs = self.env.get_observations()
+        infos = {}
+        # infos["depth"] = self.env.depth_buffer.clone().to(self.device)[:, -1] if self.if_depth else None
+        infos['height'] = self.env.height_buffer.clone().to(self.device)[:, -1] if self.if_distill_heading else None
+        infos["delta_yaw_ok"] = torch.ones(self.env.num_envs, dtype=torch.bool, device=self.device)
+        self.alg.student_vision_encoder.train()
+        self.alg.student_actor.train()
+
+        num_pretrain_iter = 0
+        for it in range(self.current_learning_iteration, tot_iter):
+            start = time.time()
+            depth_latent_buffer = []
+            # scandots_latent_buffer = []
+            actions_teacher_buffer = []
+            actions_student_buffer = []
+            yaw_buffer_student = []
+            yaw_buffer_teacher = []
+            delta_yaw_ok_buffer = []
+            for i in range(self.heading_distill_cfg["num_steps_per_env"]):
+                if infos["height"] != None:
+                    obs_prop = obs[:, :self.env.cfg.env.n_proprio].clone()
+                    obs_prop[:, 6:8] = 0
+                    height_latent_and_yaw = self.alg.student_vision_encoder(infos["height"].clone(), obs_prop)  # clone is crucial to avoid in-place operation
+                    
+                    height_latent = height_latent_and_yaw[:, :-2]
+                    yaw = 1.5*height_latent_and_yaw[:, -2:]
+                    
+                    depth_latent_buffer.append(height_latent)
+                    yaw_buffer_student.append(yaw)
+                    yaw_buffer_teacher.append(obs[:, 6:8])
+                
+                with torch.no_grad():
+                    actions_teacher = self.alg.actor_critic.act_inference(obs, hist_encoding=True, scandots_latent=None)
+                    actions_teacher_buffer.append(actions_teacher)
+
+                obs_student = obs.clone()
+                # obs_student[:, 6:8] = yaw.detach()
+                obs_student[infos["delta_yaw_ok"], 6:8] = yaw.detach()[infos["delta_yaw_ok"]]
+                delta_yaw_ok_buffer.append(torch.nonzero(infos["delta_yaw_ok"]).size(0) / infos["delta_yaw_ok"].numel())
+                actions_student = self.alg.student_actor(obs_student, hist_encoding=True, scandots_latent=height_latent)
+                actions_student_buffer.append(actions_student)
+
+                # detach actions before feeding the env
+                if it < num_pretrain_iter:
+                    obs, privileged_obs, rewards, dones, infos = self.env.step(actions_teacher.detach())  # obs has changed to next_obs !! if done obs has been reset
+                else:
+                    obs, privileged_obs, rewards, dones, infos = self.env.step(actions_student.detach())  # obs has changed to next_obs !! if done obs has been reset
+                critic_obs = privileged_obs if privileged_obs is not None else obs
+                obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
+
+                if self.log_dir is not None:
+                        # Book keeping
+                        if 'episode' in infos:
+                            ep_infos.append(infos['episode'])
+                        cur_reward_sum += rewards
+                        cur_episode_length += 1
+                        new_ids = (dones > 0).nonzero(as_tuple=False)
+                        rewbuffer.extend(cur_reward_sum[new_ids][:, 0].cpu().numpy().tolist())
+                        lenbuffer.extend(cur_episode_length[new_ids][:, 0].cpu().numpy().tolist())
+                        cur_reward_sum[new_ids] = 0
+                        cur_episode_length[new_ids] = 0
+                
+            stop = time.time()
+            collection_time = stop - start
+            start = stop
+
+            delta_yaw_ok_percentage = sum(delta_yaw_ok_buffer) / len(delta_yaw_ok_buffer)
+            # scandots_latent_buffer = torch.cat(scandots_latent_buffer, dim=0)
+            depth_latent_buffer = torch.cat(depth_latent_buffer, dim=0)
+            student_vision_encoder_loss = 0
+            # depth_encoder_loss = self.alg.update_depth_encoder(depth_latent_buffer, scandots_latent_buffer)
+
+            actions_teacher_buffer = torch.cat(actions_teacher_buffer, dim=0)
+            actions_student_buffer = torch.cat(actions_student_buffer, dim=0)
+            yaw_buffer_student = torch.cat(yaw_buffer_student, dim=0)
+            yaw_buffer_teacher = torch.cat(yaw_buffer_teacher, dim=0)
+            student_actor_loss, yaw_loss = self.alg.update_student_actor(actions_student_buffer, actions_teacher_buffer, yaw_buffer_student, yaw_buffer_teacher)
+
+            # depth_encoder_loss, depth_actor_loss = self.alg.update_depth_both(depth_latent_buffer, scandots_latent_buffer, actions_student_buffer, actions_teacher_buffer)
+            stop = time.time()
+            learn_time = stop - start
+
+            self.alg.student_vision_encoder.detach_hidden_states()
+
+            if self.log_dir is not None:
+                self.log_vision(locals())
+            if (it-self.start_learning_iteration < 2500 and it % self.save_interval == 0) or \
+               (it-self.start_learning_iteration < 5000 and it % (2*self.save_interval) == 0) or \
+               (it-self.start_learning_iteration >= 5000 and it % (5*self.save_interval) == 0):
+                    self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+            ep_infos.clear()
+
+    def log_RL(self, locs, width=80, pad=35):
         self.tot_timesteps += self.num_steps_per_env * self.env.num_envs
         self.tot_time += locs['collection_time'] + locs['learn_time']
         iteration_time = locs['collection_time'] + locs['learn_time']

@@ -61,9 +61,13 @@ def play(args):
 
     args.task = "go1"
     # args.exptid = "G0502"
-    args.exptid = "MAY-02-student"
     args.device = 'cuda:0'
-    args.use_camera = True
+
+    # args.exptid = "MAY-02-student"
+    # args.use_camera = True
+    
+    args.exptid = "MAY-02-height"
+    args.distill_only_heading = False
 
     if args.web:
         web_viewer = webviewer.WebViewer()
@@ -160,7 +164,7 @@ def play(args):
         policy = ppo_runner.get_inference_policy(device=env.device)
     estimator = ppo_runner.get_estimator_inference_policy(device=env.device)
     if env.cfg.depth.use_camera:
-        depth_encoder = ppo_runner.get_depth_encoder_inference_policy(device=env.device)
+        depth_encoder = ppo_runner.get_student_vision_encoder_inference_policy(device=env.device)
 
     actions = torch.zeros(env.num_envs, 12, device=env.device, requires_grad=False)
     infos = {}

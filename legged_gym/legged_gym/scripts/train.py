@@ -51,13 +51,15 @@ def train(args):
         args.num_envs = 64
         
         args.device = 'cuda:0'
-        args.headless = False
+        args.headless = True
         args.task = 'go1'
 
         args.exptid = "tmprun"
         args.resumeid = "MAY-02"
         args.resume = True
-        args.use_camera = True
+
+        args.distill_only_heading = True
+        # args.use_camera = True
         args.delay = True
         
     else:

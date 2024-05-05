@@ -153,6 +153,11 @@ class LeggedRobot(BaseTask):
             self.extras["depth"] = self.depth_buffer[:, -2]  # have already selected last one
         else:
             self.extras["depth"] = None
+
+        if self.cfg.height.distill_only_heading and self.global_counter % self.cfg.height.update_interval == 0:
+            self.extras["height"] = self.height_buffer[:, -2]
+        else:
+            self.extras["height"] = None
         return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras
 
     def get_history_observations(self):
@@ -184,7 +189,7 @@ class LeggedRobot(BaseTask):
             return
         
         heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.3 - self.measured_heights, -1, 1.)
-        self.height_buffer = torch.cat([self.height_buffer[:, 1:], heights], dim=1)
+        self.height_buffer = torch.cat([self.height_buffer[:, 1:], heights.unsqueeze(1)], dim=1)
 
     def update_depth_buffer(self):
         if not self.cfg.depth.use_camera:
@@ -802,8 +807,8 @@ class LeggedRobot(BaseTask):
         elif self.cfg.height.distill_only_heading:
             self.height_buffer = torch.zeros(self.num_envs,
                                              self.cfg.height.buffer_len,
-                                            
-                                             )
+                                             self.cfg.env.n_scan,
+                                             ).to(self.device)
 
     def _prepare_reward_function(self):
         """ Prepares a list of reward functions, whcih will be called to compute the total reward.
