@@ -79,24 +79,27 @@ class OnPolicyRunner:
         self.if_depth = self.depth_encoder_cfg["if_depth"]
         self.if_distill_heading = self.heading_distill_cfg["if_distill_heading"]
         if self.if_depth:
-            depth_backbone = DepthOnlyFCBackbone58x87(env.cfg.env.n_proprio, 
+            student_vision_encoder_backbone = DepthOnlyFCBackbone58x87(env.cfg.env.n_proprio, 
                                                     self.policy_cfg["scan_encoder_dims"][-1], 
                                                     self.depth_encoder_cfg["hidden_dims"],
                                                     )
-            depth_encoder = RecurrentDepthBackbone(depth_backbone, env.cfg).to(self.device)
-            depth_actor = deepcopy(actor_critic.actor)
+            student_vision_encoder = RecurrentDepthBackbone(student_vision_encoder_backbone, env.cfg).to(self.device)
+            student_actor = deepcopy(actor_critic.actor)
+            student_vision_encoder_paras = self.depth_encoder_cfg
         elif self.if_distill_heading:
-            height_backbone = deepcopy(actor_critic.actor.scan_encoder)
-            height_encoder = RecurrentHeighBackbone(height_backbone, env.cfg).to(self.device)
-            depth_actor = deepcopy(actor_critic.actor)
+            student_vision_encoder_backbone = deepcopy(actor_critic.actor.scan_encoder)
+            student_vision_encoder = RecurrentHeighBackbone(student_vision_encoder_backbone, env.cfg).to(self.device)
+            student_actor = deepcopy(actor_critic.actor)
         else:
-            depth_encoder = None
-            depth_actor = None
+            student_vision_encoder = None
+            student_actor = None
         # Create algorithm
         alg_class = eval(self.cfg["algorithm_class_name"]) # PPO
         self.alg: PPO = alg_class(actor_critic, 
                                   estimator, self.estimator_cfg, 
-                                  depth_encoder, self.depth_encoder_cfg, depth_actor,
+                                  student_vision_encoder=student_vision_encoder, 
+                                  student_vision_encoder_paras=student_vision_encoder_paras, 
+                                  student_actor=student_actor,
                                   device=self.device, **self.alg_cfg)
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
@@ -239,8 +242,8 @@ class OnPolicyRunner:
         infos = {}
         infos["depth"] = self.env.depth_buffer.clone().to(self.device)[:, -1] if self.if_depth else None
         infos["delta_yaw_ok"] = torch.ones(self.env.num_envs, dtype=torch.bool, device=self.device)
-        self.alg.depth_encoder.train()
-        self.alg.depth_actor.train()
+        self.alg.student_vision_encoder.train()
+        self.alg.student_actor.train()
 
         num_pretrain_iter = 0
         for it in range(self.current_learning_iteration, tot_iter):
@@ -259,7 +262,7 @@ class OnPolicyRunner:
                     scandots_latent_buffer.append(scandots_latent)
                     obs_prop_depth = obs[:, :self.env.cfg.env.n_proprio].clone()
                     obs_prop_depth[:, 6:8] = 0
-                    depth_latent_and_yaw = self.alg.depth_encoder(infos["depth"].clone(), obs_prop_depth)  # clone is crucial to avoid in-place operation
+                    depth_latent_and_yaw = self.alg.student_vision_encoder(infos["depth"].clone(), obs_prop_depth)  # clone is crucial to avoid in-place operation
                     
                     depth_latent = depth_latent_and_yaw[:, :-2]
                     yaw = 1.5*depth_latent_and_yaw[:, -2:]
@@ -276,7 +279,7 @@ class OnPolicyRunner:
                 # obs_student[:, 6:8] = yaw.detach()
                 obs_student[infos["delta_yaw_ok"], 6:8] = yaw.detach()[infos["delta_yaw_ok"]]
                 delta_yaw_ok_buffer.append(torch.nonzero(infos["delta_yaw_ok"]).size(0) / infos["delta_yaw_ok"].numel())
-                actions_student = self.alg.depth_actor(obs_student, hist_encoding=True, scandots_latent=depth_latent)
+                actions_student = self.alg.student_actor(obs_student, hist_encoding=True, scandots_latent=depth_latent)
                 actions_student_buffer.append(actions_student)
 
                 # detach actions before feeding the env
@@ -306,20 +309,20 @@ class OnPolicyRunner:
             delta_yaw_ok_percentage = sum(delta_yaw_ok_buffer) / len(delta_yaw_ok_buffer)
             scandots_latent_buffer = torch.cat(scandots_latent_buffer, dim=0)
             depth_latent_buffer = torch.cat(depth_latent_buffer, dim=0)
-            depth_encoder_loss = 0
+            student_vision_encoder_loss = 0
             # depth_encoder_loss = self.alg.update_depth_encoder(depth_latent_buffer, scandots_latent_buffer)
 
             actions_teacher_buffer = torch.cat(actions_teacher_buffer, dim=0)
             actions_student_buffer = torch.cat(actions_student_buffer, dim=0)
             yaw_buffer_student = torch.cat(yaw_buffer_student, dim=0)
             yaw_buffer_teacher = torch.cat(yaw_buffer_teacher, dim=0)
-            depth_actor_loss, yaw_loss = self.alg.update_depth_actor(actions_student_buffer, actions_teacher_buffer, yaw_buffer_student, yaw_buffer_teacher)
+            student_actor_loss, yaw_loss = self.alg.update_student_actor(actions_student_buffer, actions_teacher_buffer, yaw_buffer_student, yaw_buffer_teacher)
 
             # depth_encoder_loss, depth_actor_loss = self.alg.update_depth_both(depth_latent_buffer, scandots_latent_buffer, actions_student_buffer, actions_teacher_buffer)
             stop = time.time()
             learn_time = stop - start
 
-            self.alg.depth_encoder.detach_hidden_states()
+            self.alg.student_vision_encoder.detach_hidden_states()
 
             if self.log_dir is not None:
                 self.log_vision(locals())
@@ -353,8 +356,8 @@ class OnPolicyRunner:
         fps = int(self.num_steps_per_env * self.env.num_envs / (locs['collection_time'] + locs['learn_time']))
 
         wandb_dict['Loss_depth/delta_yaw_ok_percent'] = locs['delta_yaw_ok_percentage']
-        wandb_dict['Loss_depth/depth_encoder'] = locs['depth_encoder_loss']
-        wandb_dict['Loss_depth/depth_actor'] = locs['depth_actor_loss']
+        wandb_dict['Loss_depth/student_encoder'] = locs['student_vision_encoder_loss']
+        wandb_dict['Loss_depth/student_actor'] = locs['student_actor_loss']
         wandb_dict['Loss_depth/yaw'] = locs['yaw_loss']
         wandb_dict['Policy/mean_noise_std'] = mean_std.item()
         wandb_dict['Perf/total_fps'] = fps
@@ -376,8 +379,8 @@ class OnPolicyRunner:
                           f"""{'Mean action noise std:':>{pad}} {mean_std.item():.2f}\n"""
                           f"""{'Mean reward (total):':>{pad}} {statistics.mean(locs['rewbuffer']):.2f}\n"""
                           f"""{'Mean episode length:':>{pad}} {statistics.mean(locs['lenbuffer']):.2f}\n"""
-                          f"""{'Depth encoder loss:':>{pad}} {locs['depth_encoder_loss']:.4f}\n"""
-                          f"""{'Depth actor loss:':>{pad}} {locs['depth_actor_loss']:.4f}\n"""
+                          f"""{'Student encoder loss:':>{pad}} {locs['student_vision_encoder_loss']:.4f}\n"""
+                          f"""{'Student actor loss:':>{pad}} {locs['student_actor_loss']:.4f}\n"""
                           f"""{'Yaw loss:':>{pad}} {locs['yaw_loss']:.4f}\n"""
                           f"""{'Delta yaw ok percentage:':>{pad}} {locs['delta_yaw_ok_percentage']:.4f}\n""")
         else:
@@ -497,9 +500,9 @@ class OnPolicyRunner:
             'iter': self.current_learning_iteration,
             'infos': infos,
             }
-        if self.if_depth:
-            state_dict['depth_encoder_state_dict'] = self.alg.depth_encoder.state_dict()
-            state_dict['depth_actor_state_dict'] = self.alg.depth_actor.state_dict()
+        if self.if_depth or self.if_distill_heading:
+            state_dict['student_vision_encoder_state_dict'] = self.alg.student_vision_encoder.state_dict()
+            state_dict['student_actor_state_dict'] = self.alg.student_actor.state_dict()
         torch.save(state_dict, path)
 
     def load(self, path, load_optimizer=True):
@@ -509,17 +512,17 @@ class OnPolicyRunner:
         self.alg.actor_critic.load_state_dict(loaded_dict['model_state_dict'])
         self.alg.estimator.load_state_dict(loaded_dict['estimator_state_dict'])
         if self.if_depth:
-            if 'depth_encoder_state_dict' not in loaded_dict:
-                warnings.warn("'depth_encoder_state_dict' key does not exist, not loading depth encoder...")
+            if 'student_vision_encoder_state_dict' not in loaded_dict:
+                warnings.warn("'student_vision_encoder_state_dict' key does not exist, not loading depth encoder...")
             else:
                 print("Saved depth encoder detected, loading...")
-                self.alg.depth_encoder.load_state_dict(loaded_dict['depth_encoder_state_dict'])
-            if 'depth_actor_state_dict' in loaded_dict:
+                self.alg.student_vision_encoder.load_state_dict(loaded_dict['student_vision_encoder_state_dict'])
+            if 'student_actor_state_dict' in loaded_dict:
                 print("Saved depth actor detected, loading...")
-                self.alg.depth_actor.load_state_dict(loaded_dict['depth_actor_state_dict'])
+                self.alg.student_actor.load_state_dict(loaded_dict['student_actor_state_dict'])
             else:
                 print("No saved depth actor, Copying actor critic actor to depth actor...")
-                self.alg.depth_actor.load_state_dict(self.alg.actor_critic.actor.state_dict())
+                self.alg.student_actor.load_state_dict(self.alg.actor_critic.actor.state_dict())
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict['optimizer_state_dict'])
         # self.current_learning_iteration = loaded_dict['iter']
@@ -532,11 +535,11 @@ class OnPolicyRunner:
             self.alg.actor_critic.to(device)
         return self.alg.actor_critic.act_inference
     
-    def get_depth_actor_inference_policy(self, device=None):
-        self.alg.depth_actor.eval() # switch to evaluation mode (dropout for example)
+    def get_student_actor_inference_policy(self, device=None):
+        self.alg.student_actor.eval() # switch to evaluation mode (dropout for example)
         if device is not None:
-            self.alg.depth_actor.to(device)
-        return self.alg.depth_actor
+            self.alg.student_actor.to(device)
+        return self.alg.student_actor
     
     def get_actor_critic(self, device=None):
         self.alg.actor_critic.eval() # switch to evaluation mode (dropout for example)
@@ -550,11 +553,11 @@ class OnPolicyRunner:
             self.alg.estimator.to(device)
         return self.alg.estimator.inference
 
-    def get_depth_encoder_inference_policy(self, device=None):
-        self.alg.depth_encoder.eval()
+    def get_student_vision_encoder_inference_policy(self, device=None):
+        self.alg.student_vision_encoder.eval()
         if device is not None:
-            self.alg.depth_encoder.to(device)
-        return self.alg.depth_encoder
+            self.alg.student_vision_encoder.to(device)
+        return self.alg.student_vision_encoder
     
     def get_disc_inference_policy(self, device=None):
         self.alg.discriminator.eval() # switch to evaluation mode (dropout for example)

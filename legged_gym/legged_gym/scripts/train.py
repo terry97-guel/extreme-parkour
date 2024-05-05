@@ -41,7 +41,7 @@ import wandb
 
 def train(args):
     args.headless = True
-    args.debug = True
+    # args.debug = True
 
     if args.debug:
         print("Warning: Debug mode is enabled!\n"*50)

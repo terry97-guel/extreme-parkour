@@ -197,8 +197,8 @@ def play(args):
             else:
                 depth_latent = None
             
-            if hasattr(ppo_runner.alg, "depth_actor"):
-                actions = ppo_runner.alg.depth_actor(obs.detach(), hist_encoding=True, scandots_latent=depth_latent)
+            if hasattr(ppo_runner.alg, "student_actor"):
+                actions = ppo_runner.alg.student_actor(obs.detach(), hist_encoding=True, scandots_latent=depth_latent)
             else:
                 actions = policy(obs.detach(), hist_encoding=True, scandots_latent=depth_latent)
             

@@ -62,9 +62,9 @@ class PPO:
                  actor_critic,
                  estimator,
                  estimator_paras,
-                 depth_encoder,
-                 depth_encoder_paras,
-                 depth_actor,
+                 student_vision_encoder,
+                 student_vision_encoder_paras,
+                 student_actor,
                  num_learning_epochs=1,
                  num_mini_batches=1,
                  clip_param=0.2,
@@ -122,13 +122,13 @@ class PPO:
         self.train_with_estimated_states = estimator_paras["train_with_estimated_states"]
 
         # Depth encoder
-        self.if_depth = depth_encoder != None
-        if self.if_depth:
-            self.depth_encoder = depth_encoder
-            self.depth_encoder_optimizer = optim.Adam(self.depth_encoder.parameters(), lr=depth_encoder_paras["learning_rate"])
-            self.depth_encoder_paras = depth_encoder_paras
-            self.depth_actor = depth_actor
-            self.depth_actor_optimizer = optim.Adam([*self.depth_actor.parameters(), *self.depth_encoder.parameters()], lr=depth_encoder_paras["learning_rate"])
+        self.if_student = student_vision_encoder != None
+        if self.if_student:
+            self.student_vision_encoder = student_vision_encoder
+            # self.student_vision_encoder_optimizer = optim.Adam(self.student_vision_encoder.parameters(), lr=student_vision_encoder_paras["learning_rate"])
+            self.student_vision_encoder_paras = student_vision_encoder_paras
+            self.student_actor = student_actor
+            self.student_actor_optimizer = optim.Adam([*self.student_actor.parameters(), *self.student_vision_encoder.parameters()], lr=student_vision_encoder_paras["learning_rate"])
 
     def init_storage(self, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, action_shape):
         self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor_obs_shape,  critic_obs_shape, action_shape, self.device)
@@ -324,18 +324,18 @@ class PPO:
     #         self.depth_encoder_optimizer.step()
     #         return depth_encoder_loss.item()
     
-    def update_depth_actor(self, actions_student_batch, actions_teacher_batch, yaw_student_batch, yaw_teacher_batch):
-        if self.if_depth:
-            depth_actor_loss = (actions_teacher_batch.detach() - actions_student_batch).norm(p=2, dim=1).mean()
+    def update_student_actor(self, actions_student_batch, actions_teacher_batch, yaw_student_batch, yaw_teacher_batch):
+        if self.if_student:
+            student_actor_loss = (actions_teacher_batch.detach() - actions_student_batch).norm(p=2, dim=1).mean()
             yaw_loss = (yaw_teacher_batch.detach() - yaw_student_batch).norm(p=2, dim=1).mean()
 
-            loss = depth_actor_loss + yaw_loss
+            loss = student_actor_loss + yaw_loss
 
-            self.depth_actor_optimizer.zero_grad()
+            self.student_actor_optimizer.zero_grad()
             loss.backward()
-            nn.utils.clip_grad_norm_(self.depth_actor.parameters(), self.max_grad_norm)
-            self.depth_actor_optimizer.step()
-            return depth_actor_loss.item(), yaw_loss.item()
+            nn.utils.clip_grad_norm_(self.student_actor.parameters(), self.max_grad_norm)
+            self.student_actor_optimizer.step()
+            return student_actor_loss.item(), yaw_loss.item()
     
     # def update_depth_both(self, depth_latent_batch, scandots_latent_batch, actions_student_batch, actions_teacher_batch):
     #     if self.if_depth:
