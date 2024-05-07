@@ -90,7 +90,7 @@ def play(args):
             args.distill_only_heading = True
             args.use_camera = False
             draw_heights = True
-            draw_goals = True
+            draw_goals = False
             return args, draw_goals, draw_heights
 
     args, draw_goals, draw_heights = update_args(args, play_type)
