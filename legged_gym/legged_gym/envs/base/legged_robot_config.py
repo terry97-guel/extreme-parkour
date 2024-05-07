@@ -37,6 +37,9 @@ class LeggedRobotCfg(BaseConfig):
     class play:
         load_student_config = False
         mask_priv_obs = False
+        draw_goals = True
+        draw_heights = False
+        
     class env:
         num_envs = 6144
 

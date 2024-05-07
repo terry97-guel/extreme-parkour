@@ -288,7 +288,7 @@ class LeggedRobot(BaseTask):
 
         if self.viewer and self.enable_viewer_sync and self.debug_viz:
             self.gym.clear_lines(self.viewer)
-            # self._draw_height_samples()
+            self._draw_height_samples()
             self._draw_goals()
             self._draw_feet()
             if self.cfg.depth.use_camera:
@@ -1097,6 +1097,8 @@ class LeggedRobot(BaseTask):
         # draw height lines
         if not self.terrain.cfg.measure_heights:
             return
+        if not self.cfg.play.draw_heights:
+            return
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         sphere_geom = gymutil.WireframeSphereGeometry(0.02, 4, 4, None, color=(1, 1, 0))
         i = self.lookat_id
@@ -1111,6 +1113,8 @@ class LeggedRobot(BaseTask):
             gymutil.draw_lines(sphere_geom, self.gym, self.viewer, self.envs[i], sphere_pose)
     
     def _draw_goals(self):
+        if not self.cfg.play.draw_goals:
+            return
         sphere_geom = gymutil.WireframeSphereGeometry(0.1, 32, 32, None, color=(1, 0, 0))
         sphere_geom_cur = gymutil.WireframeSphereGeometry(0.1, 32, 32, None, color=(0, 0, 1))
         sphere_geom_reached = gymutil.WireframeSphereGeometry(self.cfg.env.next_goal_threshold, 32, 32, None, color=(0, 1, 0))
@@ -1127,7 +1131,7 @@ class LeggedRobot(BaseTask):
             else:
                 gymutil.draw_lines(sphere_geom, self.gym, self.viewer, self.envs[self.lookat_id], pose)
         
-        if not self.cfg.depth.use_camera:
+        if not self.cfg.depth.use_camera or not self.cfg.height.distill_only_heading:
             sphere_geom_arrow = gymutil.WireframeSphereGeometry(0.02, 16, 16, None, color=(1, 0.35, 0.25))
             pose_robot = self.root_states[self.lookat_id, :3].cpu().numpy()
             for i in range(5):
