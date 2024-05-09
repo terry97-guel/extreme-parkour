@@ -58,7 +58,7 @@ def train(args):
         args.resumeid = "MAY-02"
         args.resume = True
 
-        args.distill_only_heading = True
+        # args.distill_only_heading = True
         # args.use_camera = True
         args.delay = True
         

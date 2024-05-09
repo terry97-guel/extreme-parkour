@@ -67,18 +67,18 @@ def play(args):
     args.task = "go1"
     args.device = 'cuda:0'
 
+    args.exptid = "MAY-02"
     play_type = PLAY_TYPE.HEIGHT
     
     def update_args(args, play_type):
         if play_type == PLAY_TYPE.TEACHER:
-            args.exptid = "MAY-02"
             args.use_camera = False
             draw_heights = True
             draw_goals = True
             return args, draw_goals, draw_heights
         
         if play_type == PLAY_TYPE.VISION:
-            args.exptid = "MAY-02-student"
+            args.exptid += "-student"
             args.use_camera = True
             # args.checkpoint = "200"
             draw_heights = False
@@ -86,7 +86,7 @@ def play(args):
             return args, draw_goals, draw_heights
         
         if play_type == PLAY_TYPE.HEIGHT:
-            args.exptid = "MAY-02-height"
+            args.exptid += "-height"
             args.distill_only_heading = True
             args.use_camera = False
             draw_heights = True
