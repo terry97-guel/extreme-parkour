@@ -185,6 +185,26 @@ class LeggedRobotCfg(BaseConfig):
         num_rows= 10 # number of terrain rows (levels)  # spreaded is benifitiall !
         num_cols = 40 # number of terrain cols (types)
         
+        # terrain_dict = {"smooth slope": 0., 
+        #                 "rough slope up": 0.0,
+        #                 "rough slope down": 0.0,
+        #                 "rough stairs up": 0., 
+        #                 "rough stairs down": 0., 
+        #                 "discrete": 0., 
+        #                 "stepping stones": 0.0,
+        #                 "gaps": 0., 
+        #                 "smooth flat": 0,
+        #                 "pit": 0.0,
+        #                 "wall": 0.0,
+        #                 "platform": 0.,
+        #                 "large stairs up": 0.,
+        #                 "large stairs down": 0.,
+        #                 "parkour": 0.2,
+        #                 "parkour_hurdle": 0.2,
+        #                 "parkour_flat": 0.2,
+        #                 "parkour_step": 0.2,
+        #                 "parkour_gap": 0.2,
+        #                 "demo": 0.0,}
         terrain_dict = {"smooth slope": 0., 
                         "rough slope up": 0.0,
                         "rough slope down": 0.0,
@@ -199,11 +219,11 @@ class LeggedRobotCfg(BaseConfig):
                         "platform": 0.,
                         "large stairs up": 0.,
                         "large stairs down": 0.,
-                        "parkour": 0.2,
-                        "parkour_hurdle": 0.2,
-                        "parkour_flat": 0.2,
-                        "parkour_step": 0.2,
-                        "parkour_gap": 0.2,
+                        "parkour": 0.0,
+                        "parkour_hurdle": 0.0,
+                        "parkour_flat": 1.0,
+                        "parkour_step": 0.0,
+                        "parkour_gap": 0.0,
                         "demo": 0.0,}
         terrain_proportions = list(terrain_dict.values())
         

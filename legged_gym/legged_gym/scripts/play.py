@@ -67,8 +67,8 @@ def play(args):
     args.task = "go1"
     args.device = 'cuda:0'
 
-    args.exptid = "MAY-02"
-    play_type = PLAY_TYPE.HEIGHT
+    args.exptid = "ONLY_W"
+    play_type = PLAY_TYPE.TEACHER
     
     def update_args(args, play_type):
         if play_type == PLAY_TYPE.TEACHER:
@@ -129,8 +129,8 @@ def play(args):
                                     "large stairs up": 0.,
                                     "large stairs down": 0.,
                                     "parkour": 0.0,
-                                    "parkour_hurdle": 1.0,
-                                    "parkour_flat": 0.0,
+                                    "parkour_hurdle": 0.0,
+                                    "parkour_flat": 1.0,
                                     "parkour_step": 0.0,
                                     "parkour_gap": 0.0, 
                                     "demo": 0.0}
@@ -162,18 +162,10 @@ def play(args):
     # load policy
     train_cfg.runner.resume = True
     ppo_runner, train_cfg, log_pth = task_registry.make_alg_runner(log_root = log_pth, env=env, name=args.task, args=args, train_cfg=train_cfg, return_log_dir=True)
-    
-    # if args.use_jit:
-    #     path = os.path.join(log_pth, "traced")
-    #     model, checkpoint = get_load_path(root=path, checkpoint=args.checkpoint)
-    #     path = os.path.join(path, model)
-    #     print("Loading jit for policy: ", path)
-    #     policy_jit = torch.jit.load(path, map_location=env.device)
-    # else:
     if is_student:
         policy = ppo_runner.get_student_actor_inference_policy(device=env.device)
     else:
-        policy = ppo_runner.get_estimator_inference_policy(device=env.device)
+        policy = ppo_runner.get_inference_policy(device=env.device)
 
     estimator = ppo_runner.get_estimator_inference_policy(device=env.device)
     if is_student:
@@ -185,18 +177,6 @@ def play(args):
     infos['height'] = env.height_buffer.clone().to(ppo_runner.device)[:, -1] if ppo_runner.if_distill_heading else None
 
     for i in range(10*int(env.max_episode_length)):
-        # if args.use_jit:
-        #     if is_student:
-        #         if infos["depth"] is not None:
-        #             vision_latent = torch.ones((env_cfg.env.num_envs, 32), device=env.device)
-        #             actions, vision_latent = policy_jit(obs.detach(), True, infos["depth"], vision_latent)
-        #         else:
-        #             depth_buffer = torch.ones((env_cfg.env.num_envs, 58, 87), device=env.device)
-        #             actions, vision_latent = policy_jit(obs.detach(), False, depth_buffer, vision_latent)
-        #     else:
-        #         obs_jit = torch.cat((obs.detach()[:, :env_cfg.env.n_proprio+env_cfg.env.n_priv], obs.detach()[:, -env_cfg.env.history_len*env_cfg.env.n_proprio:]), dim=1)
-        #         actions = policy(obs_jit)
-        # else:
         if is_student:
             if infos["depth"] is not None:
                 obs_student = obs[:, :env.cfg.env.n_proprio].clone()
