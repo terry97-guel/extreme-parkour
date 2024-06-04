@@ -47,6 +47,9 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 from time import time, sleep
 from legged_gym.utils import webviewer
+from pathlib import Path
+
+EXPORT_POLICY = True
 
 class PLAY_TYPE():
     TEACHER = 1
@@ -195,6 +198,45 @@ def play(args):
     else:
         joystick_control = False
 
+    if EXPORT_POLICY:
+        print("Exporting policy...")
+        import copy
+        import onnxruntime as ort
+        from functools import partial
+        from torch import nn
+        export_device = 'cpu'
+
+        if is_student:
+            torch_model_src = copy.deepcopy(ppo_runner.alg.student_actor).to(export_device)
+        else:
+            torch_model_src = copy.deepcopy(ppo_runner.alg.actor_critic).to(export_device)
+
+        class ONNXExportWrapper(nn.Module):
+            def __init__(self, model):
+                super(ONNXExportWrapper, self).__init__()
+                self.model = model
+
+            def forward(self, observations):
+                return self.model.act_inference(observations, hist_encoding=True, scandots_latent=None)
+
+        torch_model = ONNXExportWrapper(torch_model_src)
+        torch_input = obs.to(export_device)
+        torch_model(torch_input)
+
+        savename = Path(f'{LEGGED_GYM_ROOT_DIR}/onnx/{args.exptid}.onnx')
+        savename.parent.mkdir(parents=True, exist_ok=True)
+        onnx_program = torch.onnx.export(
+            torch_model, 
+            torch_input,
+            savename,
+            opset_version=9,
+            input_names=["input"],
+            output_names=["action"])
+        ort_sess = ort.InferenceSession(savename)
+        outputs = ort_sess.run(None, {'input': torch_input.numpy()})[0]
+        print("Exported policy to", savename)
+        print("mean abs difference", (np.abs(outputs - torch_model(torch_input).detach().numpy())).mean())
+
     for i in range(10*int(env.max_episode_length)): 
         # if play_type == PLAY_TYPE.TEACHER_CONTROLLER:
         #     evt_lst = env.gym.query_viewer_action_events(env.viewer)
@@ -256,7 +298,7 @@ def play(args):
         # if hasattr(ppo_runner.alg, "student_actor"):
         #     actions = ppo_runner.alg.student_actor(obs.detach(), hist_encoding=True, scandots_latent=vision_latent)
         # else:
-        actions = policy(obs.detach(), hist_encoding=False, scandots_latent=vision_latent)
+        actions = policy(obs.detach(), hist_encoding=True, scandots_latent=vision_latent)
         obs, _, rews, dones, infos = env.step(actions.detach(), joystick_control)
         if args.web:
             web_viewer.render(fetch_results=True,
@@ -271,8 +313,5 @@ def play(args):
         
 
 if __name__ == '__main__':
-    EXPORT_POLICY = False
-    RECORD_FRAMES = False
-    MOVE_CAMERA = False
     args = get_args()
     play(args)
