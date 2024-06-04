@@ -107,11 +107,12 @@ class LeggedRobot(BaseTask):
         self.init_done = True
         self.global_counter = 0
         self.total_env_steps_counter = 0
+        self.yaw_overwrite = None
 
         self.reset_idx(torch.arange(self.num_envs, device=self.device))
         self.post_physics_step()
 
-    def step(self, actions):
+    def step(self, actions, joystick_control=False):
         """ Apply actions, simulate, call self.post_physics_step()
 
         Args:
@@ -134,7 +135,7 @@ class LeggedRobot(BaseTask):
         self.total_env_steps_counter += 1
         clip_actions = self.cfg.normalization.clip_actions / self.cfg.control.action_scale
         self.actions = torch.clip(actions, -clip_actions, clip_actions).to(self.device)
-        self.render()
+        self.render(joystick_control=joystick_control)
 
         for _ in range(self.cfg.control.decimation):
             self.torques = self._compute_torques(self.actions).view(self.torques.shape)
@@ -236,6 +237,10 @@ class LeggedRobot(BaseTask):
         norm = torch.norm(self.next_target_pos_rel, dim=-1, keepdim=True)
         target_vec_norm = self.next_target_pos_rel / (norm + 1e-5)
         self.next_target_yaw = torch.atan2(target_vec_norm[:, 1], target_vec_norm[:, 0])
+
+        if self.yaw_overwrite is not None:
+            self.target_yaw[self.lookat_id] = self.yaw_overwrite
+            self.next_target_yaw[self.lookat_id] = self.yaw_overwrite
 
     def post_physics_step(self):
         """ check terminations, compute observations and rewards
@@ -404,6 +409,12 @@ class LeggedRobot(BaseTask):
         if self.global_counter % 5 == 0:
             self.delta_yaw = self.target_yaw - self.yaw
             self.delta_next_yaw = self.next_target_yaw - self.yaw
+
+            self.delta_yaw = torch.remainder(self.delta_yaw + np.pi, 2 * np.pi) - np.pi
+            self.delta_next_yaw = torch.remainder(self.delta_next_yaw + np.pi, 2 * np.pi) - np.pi
+            print(self.base_ang_vel[self.lookat_id,0])
+
+        # self.base_ang_vel[:,0] = torch.remainder(self.base_ang_vel[:,0] + np.pi, 2 * np.pi) - np.pi
         obs_buf = torch.cat((#skill_vector, 
                             self.base_ang_vel  * self.obs_scales.ang_vel,   #[1,3]
                             imu_obs,    #[1,2]
@@ -1136,11 +1147,16 @@ class LeggedRobot(BaseTask):
             pose_robot = self.root_states[self.lookat_id, :3].cpu().numpy()
             for i in range(5):
                 norm = torch.norm(self.target_pos_rel, dim=-1, keepdim=True)
-                target_vec_norm = self.target_pos_rel / (norm + 1e-5)
-                pose_arrow = pose_robot[:2] + 0.1*(i+3) * target_vec_norm[self.lookat_id, :2].cpu().numpy()
+                target_vec_norm = (self.target_pos_rel / (norm + 1e-5))[self.lookat_id, :2]
+
+                if self.yaw_overwrite is not None:
+                    target_vec_norm = torch.FloatTensor([np.cos(self.yaw_overwrite), np.sin(self.yaw_overwrite)]).to(self.device)
+
+                pose_arrow = pose_robot[:2] + 0.1*(i+3) * target_vec_norm.cpu().numpy()
                 pose = gymapi.Transform(gymapi.Vec3(pose_arrow[0], pose_arrow[1], pose_robot[2]), r=None)
                 gymutil.draw_lines(sphere_geom_arrow, self.gym, self.viewer, self.envs[self.lookat_id], pose)
             
+            if self.yaw_overwrite is not None: return 
             sphere_geom_arrow = gymutil.WireframeSphereGeometry(0.02, 16, 16, None, color=(0, 1, 0.5))
             for i in range(5):
                 norm = torch.norm(self.next_target_pos_rel, dim=-1, keepdim=True)

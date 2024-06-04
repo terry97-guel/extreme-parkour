@@ -117,6 +117,10 @@ class BaseTask():
                 self.viewer, gymapi.KEY_A, "left_turn")
             self.gym.subscribe_viewer_keyboard_event(
                 self.viewer, gymapi.KEY_D, "right_turn")
+            self.gym.subscribe_viewer_keyboard_event(
+                self.viewer, gymapi.KEY_T, "toggle_walk")
+            self.gym.subscribe_viewer_keyboard_event(
+                self.viewer, gymapi.KEY_R, "reset")
         self.free_cam = False
         self.lookat_id = 0
         self.lookat_vec = torch.tensor([-0, 2, 1], requires_grad=False, device=self.device)
@@ -145,7 +149,7 @@ class BaseTask():
         cam_pos = look_at_pos + self.lookat_vec
         self.set_camera(cam_pos, look_at_pos)
 
-    def render(self, sync_frame_time=True):
+    def render(self, sync_frame_time=True, joystick_control = True):
         if self.viewer:
             # check for window closed
             if self.gym.query_viewer_has_closed(self.viewer):
@@ -175,9 +179,19 @@ class BaseTask():
                     if evt.action == "vx_minus" and evt.value > 0:
                         self.commands[self.lookat_id, 0] -= 0.2
                     if evt.action == "left_turn" and evt.value > 0:
-                        self.commands[self.lookat_id, 3] += 0.5
+                        if joystick_control:
+                            if self.yaw_overwrite is None:
+                                self.yaw_overwrite = 0
+                            self.yaw_overwrite += np.pi * 2/13
+                        # self.commands[self.lookat_id, 3] += 0.5
                     if evt.action == "right_turn" and evt.value > 0:
-                        self.commands[self.lookat_id, 3] -= 0.5
+                        if joystick_control:
+                            if self.yaw_overwrite is None:
+                                self.yaw_overwrite = 0
+                            self.yaw_overwrite -= np.pi * 2/13
+                        # self.commands[self.lookat_id, 3] -= 0.5
+                    if evt.action == "reset" and evt.value > 0:
+                        self.reset_idx(torch.tensor([self.lookat_id], device=self.device))
                 if evt.action == "free_cam" and evt.value > 0:
                     self.free_cam = not self.free_cam
                     if self.free_cam:
@@ -194,7 +208,8 @@ class BaseTask():
                         if self.gym.query_viewer_has_closed(self.viewer):
                             sys.exit()
 
-                        
+                if self.yaw_overwrite is not None:
+                    self.yaw_overwrite = np.mod(self.yaw_overwrite + np.pi, 2 * np.pi) - np.pi
                 
             # fetch results
             if self.device != 'cpu':

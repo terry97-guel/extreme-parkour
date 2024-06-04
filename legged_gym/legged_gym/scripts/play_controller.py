@@ -31,7 +31,6 @@
 from legged_gym import LEGGED_GYM_ROOT_DIR
 import os
 import code
-import sys
 
 import isaacgym
 from legged_gym.envs import *
@@ -54,6 +53,7 @@ class PLAY_TYPE():
     HEIGHT  = 3
     TEACHER_CONTROLLER = 4
 
+
 def get_load_path(root, load_run=-1, checkpoint=-1, model_name_include="model"):
     if checkpoint==-1:
         models = [file for file in os.listdir(root) if model_name_include in file]
@@ -70,10 +70,10 @@ def play(args):
     args.device = 'cuda:0'
 
     args.exptid = "MAY-02"
-    play_type = PLAY_TYPE.TEACHER_CONTROLLER
+    play_type = PLAY_TYPE.TEACHER
     
     def update_args(args, play_type):
-        if play_type in [PLAY_TYPE.TEACHER, PLAY_TYPE.TEACHER_CONTROLLER]:
+        if play_type == PLAY_TYPE.TEACHER:
             args.use_camera = False
             draw_heights = True
             draw_goals = True
@@ -92,6 +92,12 @@ def play(args):
             args.distill_only_heading = True
             args.use_camera = False
             draw_heights = True
+            draw_goals = False
+            return args, draw_goals, draw_heights
+        
+        if play_type == PLAY_TYPE.TEACHER_CONTROLLER:
+            args.use_camera = False
+            draw_heights = False
             draw_goals = False
             return args, draw_goals, draw_heights
 
@@ -186,56 +192,19 @@ def play(args):
     infos["depth"] = env.depth_buffer.clone().to(ppo_runner.device)[:, -1] if ppo_runner.if_depth else None
     infos['height'] = env.height_buffer.clone().to(ppo_runner.device)[:, -1] if ppo_runner.if_distill_heading else None
 
-
-    if play_type == PLAY_TYPE.TEACHER_CONTROLLER:
-        original_env_class = env.env_class[0]
-        env_class_counter = 0
-        target_yaw = 0
-        joystick_control = True
-    else:
-        joystick_control = False
-
-    for i in range(10*int(env.max_episode_length)): 
-        # if play_type == PLAY_TYPE.TEACHER_CONTROLLER:
-        #     evt_lst = env.gym.query_viewer_action_events(env.viewer)
-        #     for evt in evt_lst:
-        #         print(evt.action)
-        #         if evt.action == "QUIT" and evt.value > 0:
-        #             sys.exit()
-        #         # elif evt.action == "toggle_viewer_sync" and evt.value > 0:
-        #         #     env.enable_viewer_sync = not env.enable_viewer_sync
-
-        #         if evt.action == 'toggle_walk' and evt.value > 0:
-        #             if env_class_counter % 2 == 0:
-        #                 env.env_class[0] = 17
-        #             else:
-        #                 env.env_class[0] = original_env_class
-        #             env_class_counter += 1
-
-        #         if evt.action == "vx_plus" and evt.value > 0:
-        #             env.commands[0, 0] += 0.1
-        #             env.commands[0, 0] = torch.clip(env.commands[0, 0], 0, 1)
-        #         if evt.action == "vx_minus" and evt.value > 0:
-        #             env.commands[0, 0] -= 0.1
-        #             env.commands[0, 0] = torch.clip(env.commands[0, 0], 0, 1)
-        #         if evt.action == "left_turn" and evt.value > 0:
-        #             target_yaw += float(np.pi/12)
-        #         if evt.action == "right_turn" and evt.value > 0:
-        #             target_yaw -= float(np.pi/12)
-        #         if evt.action == "pause" and evt.value > 0:
-        #             env.pause = True
-        #             while env.pause:
-        #                 sleep(0.1)
-        #                 env.gym.draw_viewer(env.viewer, env.sim, True)
-        #                 for evt in env.gym.query_viewer_action_events(env.viewer):
-        #                     if evt.action == "pause" and evt.value > 0:
-        #                         env.pause = False
-        #                 if env.gym.query_viewer_has_closed(env.viewer):
-        #                     sys.exit()
-        #     env.gym.poll_viewer_events(env.viewer)
-        #     env.yaw_overwrite = target_yaw
-            # print(env.target_yaw)
-
+    for i in range(10*int(env.max_episode_length)):
+        # if args.use_jit:
+        #     if is_student:
+        #         if infos["depth"] is not None:
+        #             vision_latent = torch.ones((env_cfg.env.num_envs, 32), device=env.device)
+        #             actions, vision_latent = policy_jit(obs.detach(), True, infos["depth"], vision_latent)
+        #         else:
+        #             depth_buffer = torch.ones((env_cfg.env.num_envs, 58, 87), device=env.device)
+        #             actions, vision_latent = policy_jit(obs.detach(), False, depth_buffer, vision_latent)
+        #     else:
+        #         obs_jit = torch.cat((obs.detach()[:, :env_cfg.env.n_proprio+env_cfg.env.n_priv], obs.detach()[:, -env_cfg.env.history_len*env_cfg.env.n_proprio:]), dim=1)
+        #         actions = policy(obs_jit)
+        # else:
         if is_student:
             if infos["depth"] is not None:
                 obs_student = obs[:, :env.cfg.env.n_proprio].clone()
@@ -256,16 +225,20 @@ def play(args):
         # if hasattr(ppo_runner.alg, "student_actor"):
         #     actions = ppo_runner.alg.student_actor(obs.detach(), hist_encoding=True, scandots_latent=vision_latent)
         # else:
-        actions = policy(obs.detach(), hist_encoding=False, scandots_latent=vision_latent)
-        obs, _, rews, dones, infos = env.step(actions.detach(), joystick_control)
+            
+        
+
+        actions = policy(obs.detach(), hist_encoding=True, scandots_latent=vision_latent)
+            
+        obs, _, rews, dones, infos = env.step(actions.detach())
         if args.web:
             web_viewer.render(fetch_results=True,
                         step_graphics=True,
                         render_all_camera_sensors=True,
                         wait_for_page_load=True)
-        # print("time:", env.episode_length_buf[env.lookat_id].item() / 50, 
-        #       "cmd vx", env.commands[env.lookat_id, 0].item(),
-        #       "actual vx", env.base_lin_vel[env.lookat_id, 0].item(), )
+        print("time:", env.episode_length_buf[env.lookat_id].item() / 50, 
+              "cmd vx", env.commands[env.lookat_id, 0].item(),
+              "actual vx", env.base_lin_vel[env.lookat_id, 0].item(), )
         
         id = env.lookat_id
         
