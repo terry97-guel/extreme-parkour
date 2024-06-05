@@ -220,7 +220,7 @@ def play(args):
                 return self.model.act_inference(observations, hist_encoding=True, scandots_latent=None)
 
         torch_model = ONNXExportWrapper(torch_model_src)
-        torch_input = obs.to(export_device)
+        torch_input = obs[1,None,:].to(export_device)
         torch_model(torch_input)
 
         savename = Path(f'{LEGGED_GYM_ROOT_DIR}/onnx/{args.exptid}.onnx')
