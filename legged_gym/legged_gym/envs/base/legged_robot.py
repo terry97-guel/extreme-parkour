@@ -412,7 +412,7 @@ class LeggedRobot(BaseTask):
 
             self.delta_yaw = torch.remainder(self.delta_yaw + np.pi, 2 * np.pi) - np.pi
             self.delta_next_yaw = torch.remainder(self.delta_next_yaw + np.pi, 2 * np.pi) - np.pi
-            print(self.base_ang_vel[self.lookat_id,0])
+            # print(self.base_ang_vel[self.lookat_id,0])
 
         # self.base_ang_vel[:,0] = torch.remainder(self.base_ang_vel[:,0] + np.pi, 2 * np.pi) - np.pi
         obs_buf = torch.cat((#skill_vector, 

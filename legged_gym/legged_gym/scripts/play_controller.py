@@ -69,7 +69,8 @@ def play(args):
     args.task = "go1"
     args.device = 'cuda:0'
 
-    args.exptid = "MAY-02"
+    args.exptid = "JUL-24"
+    # args.checkpoint = 10_000
     play_type = PLAY_TYPE.TEACHER
     
     def update_args(args, play_type):

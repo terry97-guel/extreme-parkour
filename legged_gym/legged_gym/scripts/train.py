@@ -41,7 +41,7 @@ import wandb
 
 def train(args):
     args.headless = True
-    args.debug = True
+    args.debug = False
 
     if args.debug:
         print("Warning: Debug mode is enabled!\n"*50)
@@ -55,7 +55,7 @@ def train(args):
         args.task = 'go1'
 
         args.exptid = "tmprun"
-        args.resumeid = "MAY-02"
+        args.resumeid = "JUL-02"
         args.resume = True
 
         # args.distill_only_heading = True
