@@ -1172,6 +1172,10 @@ class LeggedRobot(BaseTask):
                 if self.yaw_overwrite is not None:
                     target_vec_norm = torch.FloatTensor([np.cos(self.yaw_overwrite), np.sin(self.yaw_overwrite)]).to(self.device)
 
+                # plot backward for backward env
+                if self.env_class[self.lookat_id] == 21:
+                    target_vec_norm *= -1
+
                 pose_arrow = pose_robot[:2] + 0.1*(i+3) * target_vec_norm.cpu().numpy()
                 pose = gymapi.Transform(gymapi.Vec3(pose_arrow[0], pose_arrow[1], pose_robot[2]), r=None)
                 gymutil.draw_lines(sphere_geom_arrow, self.gym, self.viewer, self.envs[self.lookat_id], pose)
@@ -1181,6 +1185,11 @@ class LeggedRobot(BaseTask):
             for i in range(5):
                 norm = torch.norm(self.next_target_pos_rel, dim=-1, keepdim=True)
                 target_vec_norm = self.next_target_pos_rel / (norm + 1e-5)
+                
+                # plot backward for backward env
+                if self.env_class[self.lookat_id] == 21:
+                    target_vec_norm *= -1
+
                 pose_arrow = pose_robot[:2] + 0.2*(i+3) * target_vec_norm[self.lookat_id, :2].cpu().numpy()
                 pose = gymapi.Transform(gymapi.Vec3(pose_arrow[0], pose_arrow[1], pose_robot[2]), r=None)
                 gymutil.draw_lines(sphere_geom_arrow, self.gym, self.viewer, self.envs[self.lookat_id], pose)
