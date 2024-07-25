@@ -83,6 +83,28 @@ class Go1RoughCfg( LeggedRobotCfg ):
         # difficulty_scale = 0.66
         difficulty_scale = 1.0
         max_init_terrain_level = 3
+        terrain_dict = {"smooth slope": 0., 
+                        "rough slope up": 0.0,
+                        "rough slope down": 0.0,
+                        "rough stairs up": 0., 
+                        "rough stairs down": 0., 
+                        "discrete": 0., 
+                        "stepping stones": 0.0,
+                        "gaps": 0., 
+                        "smooth flat": 0,
+                        "pit": 0.0,
+                        "wall": 0.0,
+                        "platform": 0.,
+                        "large stairs up": 0.,
+                        "large stairs down": 0.,
+                        "parkour": 0.166,
+                        "parkour_hurdle": 0.166,
+                        "parkour_flat": 0.166,
+                        "parkour_step": 0.166,
+                        "parkour_gap": 0.166,
+                        "demo": 0.0,
+                        "parkour_backward": 0.166,}
+        terrain_proportions = list(terrain_dict.values())
 
 class Go1RoughCfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):

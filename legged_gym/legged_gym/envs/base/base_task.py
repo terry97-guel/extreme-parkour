@@ -176,8 +176,10 @@ class BaseTask():
                         self.lookat(self.lookat_id)
                     if evt.action == "vx_plus" and evt.value > 0:
                         self.commands[self.lookat_id, 0] += 0.2
+                        self.commands = torch.clip(self.commands, -1, 1)
                     if evt.action == "vx_minus" and evt.value > 0:
                         self.commands[self.lookat_id, 0] -= 0.2
+                        self.commands = torch.clip(self.commands, -1, 1)
                     if evt.action == "left_turn" and evt.value > 0:
                         if joystick_control:
                             if self.yaw_overwrite is None:

@@ -72,7 +72,7 @@ def play(args):
     args.task = "go1"
     args.device = 'cuda:0'
 
-    args.exptid = "JUL-24"
+    args.exptid = "BCK-25"
     # args.checkpoint = 10_000
     play_type = PLAY_TYPE.TEACHER_CONTROLLER
     
@@ -135,11 +135,12 @@ def play(args):
                                     "large stairs up": 0.,
                                     "large stairs down": 0.,
                                     "parkour": 0.0,
-                                    "parkour_hurdle": 1.0,
+                                    "parkour_hurdle": 0.0,
                                     "parkour_flat": 0.0,
                                     "parkour_step": 0.0,
                                     "parkour_gap": 0.0, 
-                                    "demo": 0.0}
+                                    "demo": 0.0,
+                                    "parkour_backward": 1.00}
     
     env_cfg.terrain.terrain_proportions = list(env_cfg.terrain.terrain_dict.values())
     env_cfg.terrain.curriculum = False

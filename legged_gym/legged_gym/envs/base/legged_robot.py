@@ -75,6 +75,9 @@ def euler_from_quaternion(quat_angle):
      
         return roll_x, pitch_y, yaw_z # in radians
 
+def is_backward_env(env_class):
+    return env_class == 21
+
 class LeggedRobot(BaseTask):
     def __init__(self, cfg: LeggedRobotCfg, sim_params, physics_engine, sim_device, headless):
         """ Parses the provided config file,
@@ -237,6 +240,11 @@ class LeggedRobot(BaseTask):
         norm = torch.norm(self.next_target_pos_rel, dim=-1, keepdim=True)
         target_vec_norm = self.next_target_pos_rel / (norm + 1e-5)
         self.next_target_yaw = torch.atan2(target_vec_norm[:, 1], target_vec_norm[:, 0])
+
+        # add pi to the target yaw if the environment is backward
+        is_backward_env = self.env_class == 21
+        self.target_yaw[is_backward_env] = self.target_yaw[is_backward_env] + np.pi
+        self.next_target_yaw[is_backward_env] = self.next_target_yaw[is_backward_env] + np.pi
 
         if self.yaw_overwrite is not None:
             self.target_yaw[self.lookat_id] = self.yaw_overwrite
@@ -601,14 +609,18 @@ class LeggedRobot(BaseTask):
             env_ids (List[int]): Environments ids for which new commands are needed
         """
         self.commands[env_ids, 0] = torch_rand_float(self.command_ranges["lin_vel_x"][0], self.command_ranges["lin_vel_x"][1], (len(env_ids), 1), device=self.device).squeeze(1)
-        if self.cfg.commands.heading_command:
-            self.commands[env_ids, 3] = torch_rand_float(self.command_ranges["heading"][0], self.command_ranges["heading"][1], (len(env_ids), 1), device=self.device).squeeze(1)
-        else:
-            self.commands[env_ids, 2] = torch_rand_float(self.command_ranges["ang_vel_yaw"][0], self.command_ranges["ang_vel_yaw"][1], (len(env_ids), 1), device=self.device).squeeze(1)
-            self.commands[env_ids, 2] *= torch.abs(self.commands[env_ids, 2]) > self.cfg.commands.ang_vel_clip
+
+        is_backward_env = self.env_class[env_ids] == 21
+        self.commands[env_ids[is_backward_env], 0] *= -1
+
+        # if self.cfg.commands.heading_command:
+        #     self.commands[env_ids, 3] = torch_rand_float(self.command_ranges["heading"][0], self.command_ranges["heading"][1], (len(env_ids), 1), device=self.device).squeeze(1)
+        # else:
+            # self.commands[env_ids, 2] = torch_rand_float(self.command_ranges["ang_vel_yaw"][0], self.command_ranges["ang_vel_yaw"][1], (len(env_ids), 1), device=self.device).squeeze(1)
+            # self.commands[env_ids, 2] *= torch.abs(self.commands[env_ids, 2]) > self.cfg.commands.ang_vel_clip
 
         # set small commands to zero
-        self.commands[env_ids, :2] *= torch.abs(self.commands[env_ids, 0:1]) > self.cfg.commands.lin_vel_clip
+        # self.commands[env_ids, :2] *= torch.abs(self.commands[env_ids, 0:1]) > self.cfg.commands.lin_vel_clip
 
     def _compute_torques(self, actions):
         """ Compute torques from actions.
@@ -680,6 +692,14 @@ class LeggedRobot(BaseTask):
         else:
             self.root_states[env_ids] = self.base_init_state
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
+
+        # Flip for backward environment
+        
+        # get env_ids such that self.env_class[env_ids] == 21
+        backward_env_ids = env_ids[self.env_class[env_ids] == 21]
+        flip_quat = quat_from_euler_xyz(torch.zeros_like(backward_env_ids), torch.zeros_like(backward_env_ids), torch.pi * torch.ones_like(backward_env_ids))
+        self.root_states[backward_env_ids, 3:7] = quat_mul(self.root_states[backward_env_ids, 3:7], flip_quat)
+
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                      gymtorch.unwrap_tensor(self.root_states),
@@ -704,7 +724,7 @@ class LeggedRobot(BaseTask):
             return
         
         dis_to_origin = torch.norm(self.root_states[env_ids, :2] - self.env_origins[env_ids, :2], dim=1)
-        threshold = self.commands[env_ids, 0] * self.cfg.env.episode_length_s
+        threshold = torch.abs(self.commands[env_ids, 0]) * self.cfg.env.episode_length_s
         move_up =dis_to_origin > 0.8*threshold
         move_down = dis_to_origin < 0.4*threshold
 
@@ -1268,7 +1288,7 @@ class LeggedRobot(BaseTask):
         norm = torch.norm(self.target_pos_rel, dim=-1, keepdim=True)
         target_vec_norm = self.target_pos_rel / (norm + 1e-5)
         cur_vel = self.root_states[:, 7:9]
-        rew = torch.minimum(torch.sum(target_vec_norm * cur_vel, dim=-1), self.commands[:, 0]) / (self.commands[:, 0] + 1e-5)
+        rew = torch.minimum(torch.sum(target_vec_norm * cur_vel, dim=-1), torch.abs(self.commands[:, 0])) / (torch.abs(self.commands[:, 0]) + 1e-5)
         return rew
 
     def _reward_tracking_yaw(self):

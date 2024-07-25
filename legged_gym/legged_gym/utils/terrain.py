@@ -255,6 +255,7 @@ class Terrain:
             terrain_utils.pyramid_stairs_terrain(terrain, step_width=1., step_height=height, platform_size=3.)
             self.add_roughness(terrain)
         elif choice < self.proportions[14]:
+            # parkour terrain (inclined stepping stones)
             x_range = [-0.1, 0.1+0.3*difficulty]  # offset to stone_len
             y_range = [0.2, 0.3+0.1*difficulty]
             stone_len = [0.9 - 0.3*difficulty, 1 - 0.2*difficulty]#2 * round((0.6) / 2.0, 1)
@@ -274,6 +275,7 @@ class Terrain:
             # terrain.height_field_raw[:] = 0
             self.add_roughness(terrain)
         elif choice < self.proportions[15]:
+            # hurdle terrain
             idx = 16
             parkour_hurdle_terrain(terrain,
                                    num_stones=self.num_goals - 2,
@@ -287,6 +289,7 @@ class Terrain:
             # terrain.height_field_raw[:] = 0
             self.add_roughness(terrain)
         elif choice < self.proportions[16]:
+            # flat terrain
             idx = 17
             parkour_hurdle_terrain(terrain,
                                    num_stones=self.num_goals - 2,
@@ -299,6 +302,7 @@ class Terrain:
                                    )
             self.add_roughness(terrain)
         elif choice < self.proportions[17]:
+            # step terrain
             idx = 18
             parkour_step_terrain(terrain,
                                    num_stones=self.num_goals - 2,
@@ -310,6 +314,7 @@ class Terrain:
                                    )
             self.add_roughness(terrain)
         elif choice < self.proportions[18]:
+            # gap terrain
             idx = 19
             parkour_gap_terrain(terrain,
                                 num_gaps=self.num_goals - 2,
@@ -323,9 +328,24 @@ class Terrain:
                                 )
             self.add_roughness(terrain)
         elif choice < self.proportions[19]:
+            # demo terrain
             idx = 20
             demo_terrain(terrain)
             self.add_roughness(terrain)
+        elif choice < self.proportions[20]:
+            # backward terrain
+            idx = 21
+            parkour_hurdle_terrain(terrain,
+                                   num_stones=self.num_goals - 2,
+                                   stone_len=0.1+0.3*difficulty,
+                                   hurdle_height_range=[0.1+0.1*difficulty, 0.15+0.15*difficulty],
+                                   pad_height=0,
+                                   y_range=self.cfg.y_range,
+                                   half_valid_width=[0.45, 1],
+                                   flat=True
+                                   )
+            self.add_roughness(terrain)
+
         # np.set_printoptions(precision=2)
         # print(np.array(self.proportions), choice)
         terrain.idx = idx
