@@ -429,7 +429,8 @@ class LeggedRobot(BaseTask):
                             0*self.delta_yaw[:, None], 
                             self.delta_yaw[:, None],
                             self.delta_next_yaw[:, None],
-                            0*self.commands[:, 0:2], 
+                            0*self.commands[:, 0:1],
+                            torch.abs(self.commands[:, 0:1])<self.cfg.commands.command_threshold, 
                             self.commands[:, 0:1],  #[1,1]
                             (self.env_class != 17).float()[:, None], 
                             (self.env_class == 17).float()[:, None],
@@ -608,11 +609,17 @@ class LeggedRobot(BaseTask):
         Args:
             env_ids (List[int]): Environments ids for which new commands are needed
         """
-        self.commands[env_ids, 0] = torch_rand_float(self.command_ranges["lin_vel_x"][0], self.command_ranges["lin_vel_x"][1], (len(env_ids), 1), device=self.device).squeeze(1)
+        self.commands[env_ids, 0] = torch_rand_float(
+            max(self.command_ranges["lin_vel_x"][0], self.cfg.commands.command_threshold),
+            self.command_ranges["lin_vel_x"][1], 
+            (len(env_ids), 1), device=self.device).squeeze(1)
 
         is_backward_env = self.env_class[env_ids] == 21
         self.commands[env_ids[is_backward_env], 0] *= -1
 
+        is_stand_env = self.env_class[env_ids] == 22
+        self.commands[env_ids[is_stand_env], 0] = torch_rand_float(-self.cfg.commands.command_threshold, self.cfg.commands.command_threshold, (int(sum(is_stand_env)), 1), device=self.device).squeeze(1)
+        
         # if self.cfg.commands.heading_command:
         #     self.commands[env_ids, 3] = torch_rand_float(self.command_ranges["heading"][0], self.command_ranges["heading"][1], (len(env_ids), 1), device=self.device).squeeze(1)
         # else:
@@ -1298,6 +1305,11 @@ class LeggedRobot(BaseTask):
         target_vec_norm = self.target_pos_rel / (norm + 1e-5)
         cur_vel = self.root_states[:, 7:9]
         rew = torch.minimum(torch.sum(target_vec_norm * cur_vel, dim=-1), torch.abs(self.commands[:, 0])) / (torch.abs(self.commands[:, 0]) + 1e-5)
+
+        should_stand_env = torch.abs(self.commands[:,0]) < self.cfg.commands.command_threshold
+        stand_rew = torch.exp(-torch.norm(cur_vel, dim=1))
+        rew[should_stand_env] = stand_rew[should_stand_env]
+
         return rew
 
     def _reward_tracking_yaw(self):
@@ -1318,7 +1330,11 @@ class LeggedRobot(BaseTask):
         return rew
 
     def _reward_dof_acc(self):
-        return torch.sum(torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1)
+        dof_vel_error = torch.sum(torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1)
+
+        should_stand = torch.abs(self.commands[:,0]) < self.cfg.commands.command_threshold
+        dof_vel_error[should_stand] *= 5
+        return dof_vel_error
 
     def _reward_collision(self):
         return torch.sum(1.*(torch.norm(self.contact_forces[:, self.penalised_contact_indices, :], dim=-1) > 0.1), dim=1)
@@ -1337,6 +1353,9 @@ class LeggedRobot(BaseTask):
 
     def _reward_dof_error(self):
         dof_error = torch.sum(torch.square(self.dof_pos - self.default_dof_pos), dim=1)
+        should_stand = torch.abs(self.commands[:,0]) < self.cfg.commands.command_threshold
+        dof_error[should_stand] *= 20
+
         return dof_error
     
     def _reward_feet_stumble(self):

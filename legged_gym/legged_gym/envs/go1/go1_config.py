@@ -50,6 +50,8 @@ class Go1RoughCfg( LeggedRobotCfg ):
             'RR_calf_joint': -1.5,    # [rad]
         }
         
+    class commands( LeggedRobotCfg.commands ):
+        command_threshold = 0.1
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
         control_type = 'P'
@@ -103,7 +105,8 @@ class Go1RoughCfg( LeggedRobotCfg ):
                         "parkour_step": 0.166,
                         "parkour_gap": 0.166,
                         "demo": 0.0,
-                        "parkour_backward": 0.166,}
+                        "parkour_backward": 0.166,
+                        "stand": 0.08}
         terrain_proportions = list(terrain_dict.values())
 
 class Go1RoughCfgPPO( LeggedRobotCfgPPO ):

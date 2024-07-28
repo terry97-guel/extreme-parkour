@@ -345,6 +345,18 @@ class Terrain:
                                    flat=True
                                    )
             self.add_roughness(terrain)
+        elif choice < self.proportions[21]:
+            # stand terrain
+            idx = 22
+            parkour_hurdle_terrain(terrain,
+                                   num_stones=self.num_goals - 2,
+                                   stone_len=0.1+0.3*difficulty,
+                                   hurdle_height_range=[0.1+0.1*difficulty, 0.15+0.15*difficulty],
+                                   pad_height=0,
+                                   y_range=self.cfg.y_range,
+                                   half_valid_width=[0.45, 1],
+                                   flat=True
+                                   )
 
         # np.set_printoptions(precision=2)
         # print(np.array(self.proportions), choice)

@@ -244,6 +244,7 @@ class LeggedRobotCfg(BaseConfig):
             heading = 0.5
 
         waypoint_delta = 0.7
+        command_threshold = 0.0
 
     class init_state:
         pos = [0.0, 0.0, 1.] # x,y,z [m]

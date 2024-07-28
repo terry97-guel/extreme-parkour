@@ -72,7 +72,7 @@ def play(args):
     args.task = "go1"
     args.device = 'cuda:0'
 
-    args.exptid = "JUL-25"
+    args.exptid = "JUL-28"
     # args.checkpoint = 10_000
     play_type = PLAY_TYPE.TEACHER_CONTROLLER
     
@@ -109,7 +109,7 @@ def play(args):
 
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing
-    env_cfg.terrain.difficulty_scale = 1
+    env_cfg.terrain.difficulty_scale = 1.0
 
     if args.nodelay:
         env_cfg.domain_rand.action_delay_view = 0
@@ -135,7 +135,7 @@ def play(args):
                                     "large stairs up": 0.,
                                     "large stairs down": 0.,
                                     "parkour": 0.0,
-                                    "parkour_hurdle": 0.0,
+                                    "parkour_hurdle": 1.0,
                                     "parkour_flat": 0.0,
                                     "parkour_step": 1.0,
                                     "parkour_gap": 0.0, 
